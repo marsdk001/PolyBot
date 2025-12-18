@@ -107,6 +107,7 @@ class PlotBuffer {
         name: "Fair DOWN",
         yaxis: "y1",
         line: { dash: "solid" },
+        visible: "legendonly" 
       },
 
       {
@@ -122,6 +123,7 @@ class PlotBuffer {
         name: "Poly DOWN",
         yaxis: "y1",
         line: { dash: "dot" },
+        visible: "legendonly" 
       },
 
       {
@@ -130,6 +132,7 @@ class PlotBuffer {
         name: "Edge UP",
         yaxis: "y1",
         line: { dash: "dash" },
+        visible: "legendonly" 
       },
       {
         x: t,
@@ -137,6 +140,7 @@ class PlotBuffer {
         name: "Edge DOWN",
         yaxis: "y1",
         line: { dash: "dash" },
+        visible: "legendonly" 
       },
 
       {
@@ -151,21 +155,21 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaBybit),
         name: "% Δ Bybit",
         yaxis: "y2",
-        line: { width: 2, dash: "dot", color: "#ff9900" },
+        line: { width: 2, color: "#ff9900" },
       },
       {
         x: t,
         y: this.data.map((d) => d.deltaGate),
         name: "% Δ Gate.io",
         yaxis: "y2",
-        line: { width: 2, dash: "dash", color: "#ff00ff" },
+        line: { width: 2, color: "#ff00ff" },
       },
       {
         x: t,
         y: this.data.map((d) => d.deltaOkx),
         name: "% Δ OKX",
         yaxis: "y2",
-        line: { width: 2, dash: "longdash", color: "#00ffff" },
+        line: { width: 2, color: "#00ffff" },
       },
     ];
 
