@@ -26,6 +26,9 @@ type PlotPoint = {
   deltaGate: number;
   deltaOkx: number;
 
+  deltaAster: number;
+  deltaHyper: number;
+
   fairUp: number;
   fairDown: number;
 
@@ -107,7 +110,7 @@ class PlotBuffer {
         name: "Fair DOWN",
         yaxis: "y1",
         line: { dash: "solid" },
-        visible: "legendonly" 
+        visible: "legendonly",
       },
 
       {
@@ -123,7 +126,7 @@ class PlotBuffer {
         name: "Poly DOWN",
         yaxis: "y1",
         line: { dash: "dot" },
-        visible: "legendonly" 
+        visible: "legendonly",
       },
 
       {
@@ -132,7 +135,7 @@ class PlotBuffer {
         name: "Edge UP",
         yaxis: "y1",
         line: { dash: "dash" },
-        visible: "legendonly" 
+        visible: "legendonly",
       },
       {
         x: t,
@@ -140,7 +143,7 @@ class PlotBuffer {
         name: "Edge DOWN",
         yaxis: "y1",
         line: { dash: "dash" },
-        visible: "legendonly" 
+        visible: "legendonly",
       },
 
       {
@@ -171,6 +174,20 @@ class PlotBuffer {
         yaxis: "y2",
         line: { width: 2, color: "#00ffff" },
       },
+      // {
+      //   x: t,
+      //   y: this.data.map((d) => d.deltaAster),
+      //   name: "% Δ Aster",
+      //   yaxis: "y2",
+      //   line: { width: 2, color: "#2b2dfb" },
+      // },
+      // {
+      //   x: t,
+      //   y: this.data.map((d) => d.deltaHyper),
+      //   name: "% Δ Hyperliquid",
+      //   yaxis: "y2",
+      //   line: { width: 2, color: "#800080" },
+      // },
     ];
 
     // Layout with dual y-axes
@@ -459,16 +476,41 @@ class AutoTradingBot {
   private okxSolPrice = 0;
   private okxXrpPrice = 0;
 
+  // ===== Aster Prices =====
+  private asterBtcPrice = 0;
+  private asterEthPrice = 0;
+  private asterSolPrice = 0;
+  private asterXrpPrice = 0;
+  private asterStartPrices: Record<AssetSymbol, number> = {
+    BTC: 0,
+    ETH: 0,
+    SOL: 0,
+    XRP: 0,
+  };
+
+  // ===== Hyperliquid Prices =====
+  private hyperBtcPrice = 0;
+  private hyperEthPrice = 0;
+  private hyperSolPrice = 0;
+  private hyperXrpPrice = 0;
+  private hyperStartPrices: Record<AssetSymbol, number> = {
+    BTC: 0,
+    ETH: 0,
+    SOL: 0,
+    XRP: 0,
+  };
+
   // Start prices synced to Binance
+  private binanceStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
   private bybitStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
   private gateStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
   private okxStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
 
   // Market timing
-  private marketStartTimeBTC = 0;
-  private marketStartTimeETH = 0;
-  private marketStartTimeSOL = 0;
-  private marketStartTimeXRP = 0;
+  private binanceStartTimeBTC = 0;
+  private binanceStartTimeETH = 0;
+  private binanceStartTimeSOL = 0;
+  private binanceStartTimeXRP = 0;
 
   // Models
   private gbmBTC = new GBMFairProbability(0.935, 0.0002);
@@ -536,6 +578,8 @@ class AutoTradingBot {
   private bybitWs: WebSocket | null = null;
   private gateWs: WebSocket | null = null;
   private okxWs: WebSocket | null = null;
+  private asterWs: WebSocket | null = null;
+  private hyperWs: WebSocket | null = null;
   private running = true;
 
   constructor() {
@@ -561,6 +605,8 @@ class AutoTradingBot {
     this.connectBybitPerpTradeWS();
     this.connectGatePerpTradeWS();
     this.connectOKXPerpTradeWS();
+    // this.connectAsterPerpWS();
+    // this.connectHyperliquidWS();
     this.connectPolymarket();
     await this.preloadHistoricalVolatility();
     this.startMonitoringLoop();
@@ -571,6 +617,17 @@ class AutoTradingBot {
       this.recordPlotPoint("SOL");
       this.recordPlotPoint("XRP");
     }, SAMPLE_INTERVAL_MS);
+  }
+
+  private resetAllStartPrices() {
+    const zero = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
+
+    this.binanceStartPrices = { ...zero };
+    this.bybitStartPrices = { ...zero };
+    this.gateStartPrices = { ...zero };
+    this.okxStartPrices = { ...zero };
+    this.asterStartPrices = { ...zero };
+    this.hyperStartPrices = { ...zero };
   }
 
   private async findMarkets() {
@@ -622,22 +679,22 @@ class AutoTradingBot {
           if (symbol === "btc") {
             this.tokenIdUp = ids[0];
             this.tokenIdDown = ids[1];
-            this.marketStartTimeBTC = openTimestampMs;
+            this.binanceStartTimeBTC = openTimestampMs;
             this.binanceBtcStartPrice = 0; // Will be fetched
           } else if (symbol === "eth") {
             this.tokenIdUpETH = ids[0];
             this.tokenIdDownETH = ids[1];
-            this.marketStartTimeETH = openTimestampMs;
+            this.binanceStartTimeETH = openTimestampMs;
             this.binanceEthStartPrice = 0;
           } else if (symbol === "sol") {
             this.tokenIdUpSOL = ids[0];
             this.tokenIdDownSOL = ids[1];
-            this.marketStartTimeSOL = openTimestampMs;
+            this.binanceStartTimeSOL = openTimestampMs;
             this.binanceSolStartPrice = 0;
           } else if (symbol === "xrp") {
             this.tokenIdUpXRP = ids[0];
             this.tokenIdDownXRP = ids[1];
-            this.marketStartTimeXRP = openTimestampMs;
+            this.binanceStartTimeXRP = openTimestampMs;
             this.binanceXrpStartPrice = 0;
           }
 
@@ -824,7 +881,7 @@ class AutoTradingBot {
               this.gbmBTC.addPrice(price);
               if (
                 this.binanceBtcStartPrice === 0 &&
-                this.marketStartTimeBTC > 0
+                this.binanceStartTimeBTC > 0
               )
                 this.binanceBtcStartPrice = price;
               break;
@@ -834,7 +891,7 @@ class AutoTradingBot {
               this.gbmETH.addPrice(price);
               if (
                 this.binanceEthStartPrice === 0 &&
-                this.marketStartTimeETH > 0
+                this.binanceStartTimeETH > 0
               )
                 this.binanceEthStartPrice = price;
               break;
@@ -844,7 +901,7 @@ class AutoTradingBot {
               this.gbmSOL.addPrice(price);
               if (
                 this.binanceSolStartPrice === 0 &&
-                this.marketStartTimeSOL > 0
+                this.binanceStartTimeSOL > 0
               )
                 this.binanceSolStartPrice = price;
               break;
@@ -854,7 +911,7 @@ class AutoTradingBot {
               this.gbmXRP.addPrice(price);
               if (
                 this.binanceXrpStartPrice === 0 &&
-                this.marketStartTimeXRP > 0
+                this.binanceStartTimeXRP > 0
               )
                 this.binanceXrpStartPrice = price;
               break;
@@ -920,7 +977,7 @@ class AutoTradingBot {
 
             if (
               this.binanceBtcStartPrice === 0 &&
-              this.marketStartTimeBTC > 0
+              this.binanceStartTimeBTC > 0
             ) {
               this.binanceBtcStartPrice = price;
               console.log(`🎯 BTC perp start price set: $${price.toFixed(2)}`);
@@ -931,7 +988,7 @@ class AutoTradingBot {
 
             if (
               this.binanceEthStartPrice === 0 &&
-              this.marketStartTimeETH > 0
+              this.binanceStartTimeETH > 0
             ) {
               this.binanceEthStartPrice = price;
               console.log(`🎯 ETH perp start price set: $${price.toFixed(2)}`);
@@ -942,7 +999,7 @@ class AutoTradingBot {
 
             if (
               this.binanceSolStartPrice === 0 &&
-              this.marketStartTimeSOL > 0
+              this.binanceStartTimeSOL > 0
             ) {
               this.binanceSolStartPrice = price;
               console.log(`🎯 SOL perp start price set: $${price.toFixed(4)}`);
@@ -953,7 +1010,7 @@ class AutoTradingBot {
 
             if (
               this.binanceXrpStartPrice === 0 &&
-              this.marketStartTimeXRP > 0
+              this.binanceStartTimeXRP > 0
             ) {
               this.binanceXrpStartPrice = price;
               console.log(`🎯 XRP perp start price set: $${price.toFixed(4)}`);
@@ -1020,23 +1077,23 @@ class AutoTradingBot {
               switch (symbol) {
                 case "BTCUSDT":
                   this.bybitBtcPrice = price;
-                  if (this.bybitStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.bybitStartPrices.BTC = this.binanceBtcStartPrice;
+                  if (this.bybitStartPrices.BTC === 0)
+                    this.bybitStartPrices.BTC = price;
                   break;
                 case "ETHUSDT":
                   this.bybitEthPrice = price;
-                  if (this.bybitStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.bybitStartPrices.ETH = this.binanceEthStartPrice;
+                  if (this.bybitStartPrices.ETH === 0)
+                    this.bybitStartPrices.ETH = price;
                   break;
                 case "SOLUSDT":
                   this.bybitSolPrice = price;
-                  if (this.bybitStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.bybitStartPrices.SOL = this.binanceSolStartPrice;
+                  if (this.bybitStartPrices.SOL === 0)
+                    this.bybitStartPrices.SOL = price;
                   break;
                 case "XRPUSDT":
                   this.bybitXrpPrice = price;
-                  if (this.bybitStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.bybitStartPrices.XRP = this.binanceXrpStartPrice;
+                  if (this.bybitStartPrices.XRP === 0)
+                    this.bybitStartPrices.XRP = price;
                   break;
               }
               this.render();
@@ -1097,23 +1154,23 @@ class AutoTradingBot {
               switch (contract) {
                 case "BTC_USDT":
                   this.gateBtcPrice = price;
-                  if (this.gateStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.gateStartPrices.BTC = this.binanceBtcStartPrice;
+                  if (this.gateStartPrices.BTC === 0)
+                    this.gateStartPrices.BTC = price;
                   break;
                 case "ETH_USDT":
                   this.gateEthPrice = price;
-                  if (this.gateStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.gateStartPrices.ETH = this.binanceEthStartPrice;
+                  if (this.gateStartPrices.ETH === 0)
+                    this.gateStartPrices.ETH = price;
                   break;
                 case "SOL_USDT":
                   this.gateSolPrice = price;
-                  if (this.gateStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.gateStartPrices.SOL = this.binanceSolStartPrice;
+                  if (this.gateStartPrices.SOL === 0)
+                    this.gateStartPrices.SOL = price;
                   break;
                 case "XRP_USDT":
                   this.gateXrpPrice = price;
-                  if (this.gateStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.gateStartPrices.XRP = this.binanceXrpStartPrice;
+                  if (this.gateStartPrices.XRP === 0)
+                    this.gateStartPrices.XRP = price;
                   break;
               }
               this.render();
@@ -1171,23 +1228,23 @@ class AutoTradingBot {
               switch (instId) {
                 case "BTC-USDT-SWAP":
                   this.okxBtcPrice = price;
-                  if (this.okxStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.okxStartPrices.BTC = this.binanceBtcStartPrice;
+                  if (this.okxStartPrices.BTC === 0)
+                    this.okxStartPrices.BTC = price;
                   break;
                 case "ETH-USDT-SWAP":
                   this.okxEthPrice = price;
-                  if (this.okxStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.okxStartPrices.ETH = this.binanceEthStartPrice;
+                  if (this.okxStartPrices.ETH === 0)
+                    this.okxStartPrices.ETH = price;
                   break;
                 case "SOL-USDT-SWAP":
                   this.okxSolPrice = price;
-                  if (this.okxStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.okxStartPrices.SOL = this.binanceSolStartPrice;
+                  if (this.okxStartPrices.SOL === 0)
+                    this.okxStartPrices.SOL = price;
                   break;
                 case "XRP-USDT-SWAP":
                   this.okxXrpPrice = price;
-                  if (this.okxStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.okxStartPrices.XRP = this.binanceXrpStartPrice;
+                  if (this.okxStartPrices.XRP === 0)
+                    this.okxStartPrices.XRP = price;
                   break;
               }
               this.render();
@@ -1206,6 +1263,182 @@ class AutoTradingBot {
 
     connect();
   }
+
+  private connectAsterPerpWS() {
+    const WS_URL = "wss://fstream.asterdex.com/ws";
+    let reconnectAttempts = 0;
+
+    const connect = () => {
+      if (!this.running) return;
+
+      this.asterWs?.terminate();
+      this.asterWs = new WebSocket(WS_URL);
+
+      this.asterWs.on("open", () => {
+        reconnectAttempts = 0;
+        console.log("✅ Aster Perp WS connected");
+
+        // SUBSCRIBE explicitly (this is the missing piece)
+        const streams = [
+          "btcusdt@aggTrade",
+          "ethusdt@aggTrade",
+          "solusdt@aggTrade",
+          "xrpusdt@aggTrade",
+        ];
+
+        this.asterWs!.send(
+          JSON.stringify({
+            method: "SUBSCRIBE",
+            params: streams,
+            id: 1,
+          })
+        );
+      });
+
+      this.asterWs.on("message", (raw) => {
+        try {
+          const msg = JSON.parse(raw.toString());
+
+          // Handle both possible payload shapes
+          const data = msg.data ?? msg;
+
+          if (!data || data.e !== "aggTrade") return;
+          if (!data.s || !data.p) return;
+
+          const symbol = data.s.toUpperCase();
+          const price = parseFloat(data.p);
+
+          if (!Number.isFinite(price) || price <= 0) return;
+
+          switch (symbol) {
+            case "BTCUSDT":
+              this.asterBtcPrice = price;
+              if (this.asterStartPrices.BTC === 0) {
+                this.asterStartPrices.BTC = price;
+              }
+              break;
+
+            case "ETHUSDT":
+              this.asterEthPrice = price;
+              if (this.asterStartPrices.ETH === 0) {
+                this.asterStartPrices.ETH = price;
+              }
+              break;
+
+            case "SOLUSDT":
+              this.asterSolPrice = price;
+              if (this.asterStartPrices.SOL === 0) {
+                this.asterStartPrices.SOL = price;
+              }
+              break;
+
+            case "XRPUSDT":
+              this.asterXrpPrice = price;
+              if (this.asterStartPrices.XRP === 0) {
+                this.asterStartPrices.XRP = price;
+              }
+              break;
+          }
+        } catch {
+          // swallow malformed frames
+        }
+      });
+
+      this.asterWs.on("close", () => {
+        console.log("🔌 Aster WS closed → reconnecting...");
+        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10_000));
+      });
+
+      this.asterWs.on("error", () => {
+        this.asterWs?.close();
+      });
+    };
+
+    connect();
+  }
+
+  private connectHyperliquidWS() {
+    const WS_URL = "wss://api.hyperliquid.xyz/ws";
+    let reconnectAttempts = 0;
+
+    const connect = () => {
+      if (!this.running) return;
+      this.hyperWs?.terminate();
+      this.hyperWs = new WebSocket(WS_URL);
+
+      this.hyperWs.on("open", () => {
+        reconnectAttempts = 0;
+        console.log("✅ Hyperliquid WS connected");
+
+        // Subscribe for trades
+        ["BTC", "ETH", "SOL", "XRP"].forEach((coin) => {
+          this.hyperWs?.send(
+            JSON.stringify({
+              method: "subscribe",
+              subscription: { type: "trades", coin },
+            })
+          );
+        });
+      });
+
+      this.hyperWs.on("message", (raw) => {
+        try {
+          const msg = JSON.parse(raw.toString());
+
+          // Ignore subscription acks / heartbeats
+          if (msg.channel !== "trades" || !Array.isArray(msg.data)) return;
+
+          for (const trade of msg.data) {
+            const coin = trade.coin;
+            const price = parseFloat(trade.px);
+
+            if (!coin || !Number.isFinite(price) || price <= 0) continue;
+
+            switch (coin) {
+              case "BTC":
+                this.hyperBtcPrice = price;
+                if (this.hyperStartPrices.BTC === 0) {
+                  this.hyperStartPrices.BTC = price;
+                }
+                break;
+
+              case "ETH":
+                this.hyperEthPrice = price;
+                if (this.hyperStartPrices.ETH === 0) {
+                  this.hyperStartPrices.ETH = price;
+                }
+                break;
+
+              case "SOL":
+                this.hyperSolPrice = price;
+                if (this.hyperStartPrices.SOL === 0) {
+                  this.hyperStartPrices.SOL = price;
+                }
+                break;
+
+              case "XRP":
+                this.hyperXrpPrice = price;
+                if (this.hyperStartPrices.XRP === 0) {
+                  this.hyperStartPrices.XRP = price;
+                }
+                break;
+            }
+          }
+        } catch (err) {
+          // swallow malformed frames
+        }
+      });
+
+      this.hyperWs.on("close", () => {
+        console.log("🔌 Hyperliquid WS closed → reconnecting...");
+        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
+      });
+      this.hyperWs.on("error", () => this.hyperWs?.close());
+    };
+
+    connect();
+  }
+
   private connectPolymarket() {
     let reconnectAttempts = 0;
     const connect = () => {
@@ -1372,12 +1605,12 @@ class AutoTradingBot {
 
     const marketStartTime =
       symbol === "BTC"
-        ? this.marketStartTimeBTC
+        ? this.binanceStartTimeBTC
         : symbol === "ETH"
-        ? this.marketStartTimeETH
+        ? this.binanceStartTimeETH
         : symbol === "SOL"
-        ? this.marketStartTimeSOL
-        : this.marketStartTimeXRP;
+        ? this.binanceStartTimeSOL
+        : this.binanceStartTimeXRP;
 
     if (currentPrice <= 0 || startPrice <= 0 || marketStartTime <= 0) return;
 
@@ -1495,9 +1728,29 @@ class AutoTradingBot {
         ? this.okxSolPrice
         : this.okxXrpPrice;
 
+    const asterPrice =
+      symbol === "BTC"
+        ? this.asterBtcPrice
+        : symbol === "ETH"
+        ? this.asterEthPrice
+        : symbol === "SOL"
+        ? this.asterSolPrice
+        : this.asterXrpPrice;
+
+    const hyperPrice =
+      symbol === "BTC"
+        ? this.hyperBtcPrice
+        : symbol === "ETH"
+        ? this.hyperEthPrice
+        : symbol === "SOL"
+        ? this.hyperSolPrice
+        : this.hyperXrpPrice;
+
     const bybitStart = this.bybitStartPrices[symbol];
     const gateStart = this.gateStartPrices[symbol];
     const okxStart = this.okxStartPrices[symbol];
+    const asterStart = this.asterStartPrices[symbol];
+    const hyperStart = this.hyperStartPrices[symbol];
 
     const binanceDelta =
       binanceStart > 0
@@ -1509,6 +1762,10 @@ class AutoTradingBot {
       gateStart > 0 ? ((gatePrice - gateStart) / gateStart) * 100 : 0;
     const okxDelta =
       okxStart > 0 ? ((okxPrice - okxStart) / okxStart) * 100 : 0;
+    const asterDelta =
+      asterStart > 0 ? ((asterPrice - asterStart) / asterStart) * 100 : 0;
+    const hyperDelta =
+      hyperStart > 0 ? ((hyperPrice - hyperStart) / hyperStart) * 100 : 0;
 
     this.plotBuffers[symbol].add({
       ts: now,
@@ -1517,6 +1774,9 @@ class AutoTradingBot {
       deltaBybit: bybitDelta,
       deltaGate: gateDelta,
       deltaOkx: okxDelta,
+
+      deltaAster: asterDelta,
+      deltaHyper: hyperDelta,
 
       fairUp: fair.UP * 100,
       fairDown: fair.DOWN * 100,
@@ -1533,30 +1793,30 @@ class AutoTradingBot {
 
     const now = new Date().toLocaleTimeString();
 
-    const btcLeft = this.marketStartTimeBTC
+    const btcLeft = this.binanceStartTimeBTC
       ? Math.max(
           0,
-          Math.floor((this.marketStartTimeBTC + 900000 - Date.now()) / 1000)
+          Math.floor((this.binanceStartTimeBTC + 900000 - Date.now()) / 1000)
         )
       : 0;
 
-    const ethLeft = this.marketStartTimeETH
+    const ethLeft = this.binanceStartTimeETH
       ? Math.max(
           0,
-          Math.floor((this.marketStartTimeETH + 900000 - Date.now()) / 1000)
+          Math.floor((this.binanceStartTimeETH + 900000 - Date.now()) / 1000)
         )
       : 0;
 
-    const solLeft = this.marketStartTimeSOL
+    const solLeft = this.binanceStartTimeSOL
       ? Math.max(
           0,
-          Math.floor((this.marketStartTimeSOL + 900000 - Date.now()) / 1000)
+          Math.floor((this.binanceStartTimeSOL + 900000 - Date.now()) / 1000)
         )
       : 0;
-    const xrpLeft = this.marketStartTimeXRP
+    const xrpLeft = this.binanceStartTimeXRP
       ? Math.max(
           0,
-          Math.floor((this.marketStartTimeXRP + 900000 - Date.now()) / 1000)
+          Math.floor((this.binanceStartTimeXRP + 900000 - Date.now()) / 1000)
         )
       : 0;
 
@@ -1741,20 +2001,20 @@ class AutoTradingBot {
     const now = Date.now();
 
     const btcExpired =
-      this.marketStartTimeBTC &&
-      now > this.marketStartTimeBTC + 15 * 60 * 1000 + 1000;
+      this.binanceStartTimeBTC &&
+      now > this.binanceStartTimeBTC + 15 * 60 * 1000 + 1000;
 
     const ethExpired =
-      this.marketStartTimeETH &&
-      now > this.marketStartTimeETH + 15 * 60 * 1000 + 1000;
+      this.binanceStartTimeETH &&
+      now > this.binanceStartTimeETH + 15 * 60 * 1000 + 1000;
 
     const solExpired =
-      this.marketStartTimeSOL &&
-      now > this.marketStartTimeSOL + 15 * 60 * 1000 + 1000;
+      this.binanceStartTimeSOL &&
+      now > this.binanceStartTimeSOL + 15 * 60 * 1000 + 1000;
 
     const xrpExpired =
-      this.marketStartTimeXRP &&
-      now > this.marketStartTimeXRP + 15 * 60 * 1000 + 1000;
+      this.binanceStartTimeXRP &&
+      now > this.binanceStartTimeXRP + 15 * 60 * 1000 + 1000;
 
     // If nothing expired, do nothing
     if (!btcExpired && !ethExpired && !solExpired && !xrpExpired) return;
@@ -1831,12 +2091,12 @@ class AutoTradingBot {
 
     const marketStartTime =
       symbol === "BTC"
-        ? this.marketStartTimeBTC
+        ? this.binanceStartTimeBTC
         : symbol === "ETH"
-        ? this.marketStartTimeETH
+        ? this.binanceStartTimeETH
         : symbol === "SOL"
-        ? this.marketStartTimeSOL
-        : this.marketStartTimeXRP;
+        ? this.binanceStartTimeSOL
+        : this.binanceStartTimeXRP;
 
     const minsLeft = Math.max(0, (marketStartTime + 900000 - now) / 60000);
     if (minsLeft <= 0) return;
