@@ -9,9 +9,8 @@ import fs from "fs";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
-const PLOT_INTERVAL_SEC = 60; // 5 minutes (CHANGE TO 3600 LATER)
-const SAMPLE_INTERVAL_MS = 100;
-const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
+const PLOT_INTERVAL_SEC = 300; // 5 minutes (CHANGE TO 3600 LATER)
+const SAMPLE_INTERVAL_MS = 1000;
 const PLOTS_DIR = "./plots";
 
 if (!fs.existsSync(PLOTS_DIR)) {
@@ -20,20 +19,10 @@ if (!fs.existsSync(PLOTS_DIR)) {
 
 type PlotPoint = {
   ts: number;
-  pctDelta: number; // Binance
-
-  deltaBybit: number;
-  deltaGate: number;
-  deltaOkx: number;
-
-  fairUp: number;
-  fairDown: number;
-
-  polyUp: number;
-  polyDown: number;
-
-  edgeUp: number;
-  edgeDown: number;
+  fair: number;
+  poly: number;
+  edge: number;
+  pctDelta: number;
 };
 
 type AssetSymbol = "BTC" | "ETH" | "SOL" | "XRP";
@@ -51,17 +40,14 @@ class PlotBuffer {
 
     this.data.push(point);
 
-    if (this.data.length >= PLOT_POINTS) {
+    if (this.data.length >= PLOT_INTERVAL_SEC) {
       this.exportAndReset();
     }
   }
 
   private alignToBucket(ts: number): number {
     const d = new Date(ts);
-
-    const intervalMin = PLOT_INTERVAL_SEC / 60; // 1 now, 5 before, 60 later
-    const minutes = Math.floor(d.getMinutes() / intervalMin) * intervalMin;
-
+    const minutes = Math.floor(d.getMinutes() / 5) * 5;
     d.setMinutes(minutes, 0, 0);
     return d.getTime();
   }
@@ -72,10 +58,16 @@ class PlotBuffer {
     const start = new Date(this.bucketStart);
     const label = `${start.getFullYear()}-${(start.getMonth() + 1)
       .toString()
-      .padStart(2, "0")}-${start.getDate().toString().padStart(2, "0")}_${start
+      .padStart(2, "0")}-${start
+      .getDate()
+      .toString()
+      .padStart(2, "0")}_${start
       .getHours()
       .toString()
-      .padStart(2, "0")}-${start.getMinutes().toString().padStart(2, "0")}`;
+      .padStart(2, "0")}-${start
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
 
     const filename = `${this.symbol}_${label}.html`;
     const filepath = path.join(PLOTS_DIR, filename);
@@ -89,146 +81,49 @@ class PlotBuffer {
   }
 
   private generateHTML(): string {
-    // Use actual timestamps for x-axis
-    const t = this.data.map((d) => new Date(d.ts));
-
-    // Prepare Plotly traces
-    const traces = [
-      {
-        x: t,
-        y: this.data.map((d) => d.fairUp),
-        name: "Fair UP",
-        yaxis: "y1",
-        line: { dash: "solid" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.fairDown),
-        name: "Fair DOWN",
-        yaxis: "y1",
-        line: { dash: "solid" },
-      },
-
-      {
-        x: t,
-        y: this.data.map((d) => d.polyUp),
-        name: "Poly UP",
-        yaxis: "y1",
-        line: { dash: "dot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.polyDown),
-        name: "Poly DOWN",
-        yaxis: "y1",
-        line: { dash: "dot" },
-      },
-
-      {
-        x: t,
-        y: this.data.map((d) => d.edgeUp),
-        name: "Edge UP",
-        yaxis: "y1",
-        line: { dash: "dash" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.edgeDown),
-        name: "Edge DOWN",
-        yaxis: "y1",
-        line: { dash: "dash" },
-      },
-
-      {
-        x: t,
-        y: this.data.map((d) => d.pctDelta),
-        name: "% Δ Binance",
-        yaxis: "y2",
-        line: { width: 3, color: "#00ff00" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.deltaBybit),
-        name: "% Δ Bybit",
-        yaxis: "y2",
-        line: { width: 2, dash: "dot", color: "#ff9900" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.deltaGate),
-        name: "% Δ Gate.io",
-        yaxis: "y2",
-        line: { width: 2, dash: "dash", color: "#ff00ff" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.deltaOkx),
-        name: "% Δ OKX",
-        yaxis: "y2",
-        line: { width: 2, dash: "longdash", color: "#00ffff" },
-      },
-    ];
-
-    // Layout with dual y-axes
-    const layout = {
-      title: `${this.symbol} – 5 Minute Snapshot`,
-
-      hovermode: "x unified", // ← show all Y values at the same X
-
-      xaxis: {
-        title: "Time",
-        showspikes: true,
-        spikemode: "across",
-        spikesnap: "cursor",
-        spikecolor: "#888",
-        spikethickness: 1,
-      },
-
-      yaxis: {
-        title: "Probability / Edge (%)",
-        range: [-100, 100],
-        showspikes: true, // optional horizontal crosshair
-        spikemode: "across",
-        spikesnap: "cursor",
-        spikecolor: "#888",
-        spikethickness: 1,
-      },
-
-      yaxis2: {
-        title: "% Price Δ",
-        overlaying: "y",
-        side: "right",
-        showgrid: false,
-      },
-
-      legend: {
-        orientation: "h",
-        y: -0.2,
-      },
-
-      margin: {
-        t: 50,
-        b: 50,
-        l: 60,
-        r: 60,
-      },
-    };
+    const x = this.data.map(p => new Date(p.ts).toLocaleTimeString());
+    const fair = this.data.map(p => p.fair);
+    const poly = this.data.map(p => p.poly);
+    const edge = this.data.map(p => p.edge);
+    const pct = this.data.map(p => p.pctDelta);
 
     return `<!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="utf-8" />
-    <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
-  </head>
-  <body>
-    <div id="chart" style="width:100%;height:100vh;"></div>
-    <script>
-      const traces = ${JSON.stringify(traces)};
-      const layout = ${JSON.stringify(layout)};
-      Plotly.newPlot("chart", traces, layout);
-    </script>
-  </body>
-  </html>`;
+<html>
+<head>
+  <meta charset="utf-8" />
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+</head>
+<body>
+  <div id="chart" style="width:100%;height:100vh;"></div>
+  <script>
+    const data = [
+      { x: ${JSON.stringify(x)}, y: ${JSON.stringify(fair)}, name: "Fair", mode: "lines" },
+      { x: ${JSON.stringify(poly)}, y: ${JSON.stringify(poly)}, name: "Poly", mode: "lines" },
+      { x: ${JSON.stringify(edge)}, y: ${JSON.stringify(edge)}, name: "Edge", mode: "lines", yaxis: "y2" },
+      { x: ${JSON.stringify(pct)}, y: ${JSON.stringify(pct)}, name: "% Delta", mode: "lines", yaxis: "y3" }
+    ];
+
+    const layout = {
+      title: "${this.symbol} – 5 Minute Snapshot",
+      xaxis: { title: "Time" },
+      yaxis: { title: "Probability (%)" },
+      yaxis2: {
+        title: "Edge (%)",
+        overlaying: "y",
+        side: "right"
+      },
+      yaxis3: {
+        title: "% Price Delta",
+        overlaying: "y",
+        side: "right",
+        position: 0.95
+      }
+    };
+
+    Plotly.newPlot("chart", data, layout);
+  </script>
+</body>
+</html>`;
   }
 }
 
@@ -244,6 +139,7 @@ const COLOR_XRP = "\x1b[38;2;98;182;249m"; // #62B6F9
 // Directional
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GBM Fair Probability Calculator – zero dependencies, production-grade
@@ -298,25 +194,6 @@ class GBMFairProbability {
     );
   }
 
-  getRecentPctChange(ms: number): number {
-    if (this.history.length < 2) return 0;
-    const now = this.history[this.history.length - 1].ts;
-    const target = now - ms;
-    const pastEntry = [...this.history].reverse().find((p) => p.ts <= target);
-    if (!pastEntry) return 0;
-    const curr = this.history[this.history.length - 1].price;
-    return ((curr - pastEntry.price) / pastEntry.price) * 100;
-  }
-
-  getRecentPrice(ms: number): number {
-    if (this.history.length < 2)
-      return this.history[this.history.length - 1]?.price || 0;
-    const now = this.history[this.history.length - 1].ts;
-    const target = now - ms;
-    const pastEntry = [...this.history].reverse().find((p) => p.ts <= target);
-    return pastEntry ? pastEntry.price : this.history[0].price;
-  }
-
   // Standard normal CDF — accurate approximation
   private normCDF(x: number): number {
     const y = x * Math.SQRT1_2; // Adjust input to erf: x / sqrt(2)
@@ -350,7 +227,7 @@ class GBMFairProbability {
   }
 
   estimateVolatilityPerMinute(): number {
-    if (this.ewmaVariance == 0) return this.MIN_SIGMA_PER_MIN;
+    if (this.ewmaVariance === 0) return this.MIN_SIGMA_PER_MIN;
 
     const sigmaPerSample = Math.sqrt(this.ewmaVariance);
     const sigmaPerMinute = sigmaPerSample * Math.sqrt(60); // ~60 updates/min from trade stream
@@ -406,18 +283,9 @@ interface MarketBook {
   mid: number;
 }
 
-interface PolyPoint {
-  ts: number;
-  up: number;
-  down: number;
-}
-
 class AutoTradingBot {
   private wallet: Wallet;
   private client: ClobClient;
-
-  // ===== PRICE SOURCE CONFIG =====
-  private readonly PRICE_SOURCE: "PERP" | "SPOT" = "PERP";
 
   // Token IDs
   private tokenIdUp: string | null = null;
@@ -430,35 +298,14 @@ class AutoTradingBot {
   private tokenIdDownXRP: string | null = null;
 
   // Prices
-  private binanceBtcPrice = 0;
-  private binanceEthPrice = 0;
-  private binanceBtcStartPrice = 0;
-  private binanceEthStartPrice = 0;
-  private binanceSolPrice = 0;
-  private binanceXrpPrice = 0;
-  private binanceSolStartPrice = 0;
-  private binanceXrpStartPrice = 0;
-
-  // Multi-exchange prices
-  private bybitBtcPrice = 0;
-  private bybitEthPrice = 0;
-  private bybitSolPrice = 0;
-  private bybitXrpPrice = 0;
-
-  private gateBtcPrice = 0;
-  private gateEthPrice = 0;
-  private gateSolPrice = 0;
-  private gateXrpPrice = 0;
-
-  private okxBtcPrice = 0;
-  private okxEthPrice = 0;
-  private okxSolPrice = 0;
-  private okxXrpPrice = 0;
-
-  // Start prices synced to Binance
-  private bybitStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
-  private gateStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
-  private okxStartPrices = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
+  private btcPrice = 0;
+  private ethPrice = 0;
+  private btcStartPrice = 0;
+  private ethStartPrice = 0;
+  private solPrice = 0;
+  private xrpPrice = 0;
+  private solStartPrice = 0;
+  private xrpStartPrice = 0;
 
   // Market timing
   private marketStartTimeBTC = 0;
@@ -467,10 +314,10 @@ class AutoTradingBot {
   private marketStartTimeXRP = 0;
 
   // Models
-  private gbmBTC = new GBMFairProbability(0.935, 0.0002);
-  private gbmETH = new GBMFairProbability(0.934, 0.0002);
-  private gbmSOL = new GBMFairProbability(0.934, 0.0002);
-  private gbmXRP = new GBMFairProbability(0.93, 0.0002);
+  private gbmBTC = new GBMFairProbability(0.983, 0.0003);
+  private gbmETH = new GBMFairProbability(0.9828, 0.0003);
+  private gbmSOL = new GBMFairProbability(0.9828, 0.0003);
+  private gbmXRP = new GBMFairProbability(0.9828, 0.0003);
 
   // Fair probabilities
   private fairProbs: Record<"BTC" | "ETH" | "SOL" | "XRP", FairProbs> = {
@@ -491,14 +338,6 @@ class AutoTradingBot {
     XRP: { UP: { bid: 0, ask: 0, mid: 0 }, DOWN: { bid: 0, ask: 0, mid: 0 } },
   };
 
-  // Poly history for change detection
-  private polyHistory: Record<AssetSymbol, PolyPoint[]> = {
-    BTC: [],
-    ETH: [],
-    SOL: [],
-    XRP: [],
-  };
-
   // plot chart buffers
   private plotBuffers: Record<AssetSymbol, PlotBuffer> = {
     BTC: new PlotBuffer("BTC"),
@@ -515,23 +354,9 @@ class AutoTradingBot {
   private cooldownMs = parseInt(process.env.TRADE_COOLDOWN || "20") * 1000;
   private lastTradeTime = { BTC: 0, ETH: 0, SOL: 0, XRP: 0 };
 
-  // Spike detection config (per asset, for hybrid blending)
-  private spikeWindowMs = 2000; // Look back 2s for stability check
-  private spikeThresh: Record<AssetSymbol, number> = {
-    BTC: 0.02, // % change thresh for "spike"
-    ETH: 0.03,
-    SOL: 0.05,
-    XRP: 0.07,
-  };
-  private flipBonus = 0.05; // Extra adjustment if spike flips delta sign
-  private certaintyThresh = 2.5; // Std devs for forcing extreme probs
-
   // WebSockets
   private binanceWs: WebSocket | null = null;
   private polymarketWs: WebSocket | null = null;
-  private bybitWs: WebSocket | null = null;
-  private gateWs: WebSocket | null = null;
-  private okxWs: WebSocket | null = null;
   private running = true;
 
   constructor() {
@@ -549,24 +374,14 @@ class AutoTradingBot {
     console.clear();
     console.log("Binance Perp + GBM → Polymarket Arbitrage Bot\n");
     await this.findMarkets();
-    if (this.PRICE_SOURCE === "PERP") {
-      this.connectBinancePerpTradeWS();
-    } else {
-      this.connectBinanceSpotTradeWS();
-    }
-    this.connectBybitPerpTradeWS();
-    this.connectGatePerpTradeWS();
-    this.connectOKXPerpTradeWS();
+    this.connectBinancePerpTradeWS();
     this.connectPolymarket();
     await this.preloadHistoricalVolatility();
     this.startMonitoringLoop();
 
     setInterval(() => {
-      this.recordPlotPoint("BTC");
-      this.recordPlotPoint("ETH");
-      this.recordPlotPoint("SOL");
-      this.recordPlotPoint("XRP");
-    }, SAMPLE_INTERVAL_MS);
+      this.onSecondTick();
+    }, 1000);
   }
 
   private async findMarkets() {
@@ -619,22 +434,22 @@ class AutoTradingBot {
             this.tokenIdUp = ids[0];
             this.tokenIdDown = ids[1];
             this.marketStartTimeBTC = openTimestampMs;
-            this.binanceBtcStartPrice = 0; // Will be fetched
+            this.btcStartPrice = 0; // Will be fetched
           } else if (symbol === "eth") {
             this.tokenIdUpETH = ids[0];
             this.tokenIdDownETH = ids[1];
             this.marketStartTimeETH = openTimestampMs;
-            this.binanceEthStartPrice = 0;
+            this.ethStartPrice = 0;
           } else if (symbol === "sol") {
             this.tokenIdUpSOL = ids[0];
             this.tokenIdDownSOL = ids[1];
             this.marketStartTimeSOL = openTimestampMs;
-            this.binanceSolStartPrice = 0;
+            this.solStartPrice = 0;
           } else if (symbol === "xrp") {
             this.tokenIdUpXRP = ids[0];
             this.tokenIdDownXRP = ids[1];
             this.marketStartTimeXRP = openTimestampMs;
-            this.binanceXrpStartPrice = 0;
+            this.xrpStartPrice = 0;
           }
 
           console.log(
@@ -701,6 +516,16 @@ class AutoTradingBot {
 
         const closes = data.map((candle) => parseFloat(candle[4])); // Index 4 = close price
 
+        if (sym === "BTCUSDT") {
+          this.gbmBTC.preloadHistoricalPrices(closes);
+        } else if (sym === "ETHUSDT") {
+          this.gbmETH.preloadHistoricalPrices(closes);
+        } else if (sym === "SOLUSDT") {
+          this.gbmSOL.preloadHistoricalPrices(closes);
+        } else if (sym === "XRPUSDT") {
+          this.gbmXRP.preloadHistoricalPrices(closes);
+        }
+
         console.log(`✅ Preloaded ${closes.length} 1m candles for ${sym}`);
       } catch (err) {
         console.warn(
@@ -741,30 +566,35 @@ class AutoTradingBot {
 
       if (Array.isArray(data) && data.length > 0) {
         const openPrice = parseFloat(data[0][1]); // Index 1 = open price
+        // ... rest of your code
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        const openPrice = parseFloat(data[0][1]); // Index 1 = open price
 
         if (symbol === "btc") {
-          this.binanceBtcStartPrice = openPrice;
+          this.btcStartPrice = openPrice;
           console.log(
             `✅ True BTC start price fetched: $${openPrice.toFixed(
               2
             )} (Binance 15m open)`
           );
         } else if (symbol === "eth") {
-          this.binanceEthStartPrice = openPrice;
+          this.ethStartPrice = openPrice;
           console.log(
             `✅ True ETH start price fetched: $${openPrice.toFixed(
               2
             )} (Binance 15m open)`
           );
         } else if (symbol === "sol") {
-          this.binanceSolStartPrice = openPrice;
+          this.solStartPrice = openPrice;
           console.log(
             `✅ True SOL start price fetched: $${openPrice.toFixed(
               4
             )} (Binance 15m open)`
           );
         } else if (symbol === "xrp") {
-          this.binanceXrpStartPrice = openPrice;
+          this.xrpStartPrice = openPrice;
           console.log(
             `✅ True XRP start price fetched: $${openPrice.toFixed(
               4
@@ -784,94 +614,6 @@ class AutoTradingBot {
     console.log(
       `⬇️ ${binanceSymbol} start price will use first live tick as fallback`
     );
-  }
-
-  private connectBinanceSpotTradeWS() {
-    const WS_URL =
-      "wss://stream.binance.com:9443/stream?streams=btcusdt@trade/ethusdt@trade/solusdt@trade/xrpusdt@trade";
-
-    let reconnectAttempts = 0;
-
-    const connect = () => {
-      if (!this.running) return;
-      this.binanceWs?.terminate();
-      this.binanceWs = new WebSocket(WS_URL);
-
-      this.binanceWs.on("open", () => {
-        reconnectAttempts = 0;
-        console.log(
-          "✅ Binance SPOT TRADE WS connected — sub-second updates on every trade"
-        );
-      });
-
-      this.binanceWs.on("message", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          const trade = msg.data;
-          if (trade?.e !== "trade") return;
-
-          const symbol = trade.s;
-          const price = parseFloat(trade.p);
-          if (!price || price <= 0) return;
-
-          switch (symbol) {
-            case "BTCUSDT":
-              this.binanceBtcPrice = price;
-              this.gbmBTC.addPrice(price);
-              if (
-                this.binanceBtcStartPrice === 0 &&
-                this.marketStartTimeBTC > 0
-              )
-                this.binanceBtcStartPrice = price;
-              break;
-
-            case "ETHUSDT":
-              this.binanceEthPrice = price;
-              this.gbmETH.addPrice(price);
-              if (
-                this.binanceEthStartPrice === 0 &&
-                this.marketStartTimeETH > 0
-              )
-                this.binanceEthStartPrice = price;
-              break;
-
-            case "SOLUSDT":
-              this.binanceSolPrice = price;
-              this.gbmSOL.addPrice(price);
-              if (
-                this.binanceSolStartPrice === 0 &&
-                this.marketStartTimeSOL > 0
-              )
-                this.binanceSolStartPrice = price;
-              break;
-
-            case "XRPUSDT":
-              this.binanceXrpPrice = price;
-              this.gbmXRP.addPrice(price);
-              if (
-                this.binanceXrpStartPrice === 0 &&
-                this.marketStartTimeXRP > 0
-              )
-                this.binanceXrpStartPrice = price;
-              break;
-          }
-
-          this.updateFairProbs();
-          this.render();
-        } catch {}
-      });
-
-      this.binanceWs.on("close", () => {
-        console.log("🔌 Binance SPOT Trade WS closed → reconnecting...");
-        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
-      });
-
-      this.binanceWs.on("error", () => {
-        this.binanceWs?.close();
-      });
-    };
-
-    connect();
   }
 
   private connectBinancePerpTradeWS() {
@@ -911,47 +653,35 @@ class AutoTradingBot {
 
           // Optional: Use volume-weighted or just last price — last is fine for high-liquidity perps
           if (symbol === "BTCUSDT") {
-            this.binanceBtcPrice = price;
+            this.btcPrice = price;
             this.gbmBTC.addPrice(price);
 
-            if (
-              this.binanceBtcStartPrice === 0 &&
-              this.marketStartTimeBTC > 0
-            ) {
-              this.binanceBtcStartPrice = price;
+            if (this.btcStartPrice === 0 && this.marketStartTimeBTC > 0) {
+              this.btcStartPrice = price;
               console.log(`🎯 BTC perp start price set: $${price.toFixed(2)}`);
             }
           } else if (symbol === "ETHUSDT") {
-            this.binanceEthPrice = price;
+            this.ethPrice = price;
             this.gbmETH.addPrice(price);
 
-            if (
-              this.binanceEthStartPrice === 0 &&
-              this.marketStartTimeETH > 0
-            ) {
-              this.binanceEthStartPrice = price;
+            if (this.ethStartPrice === 0 && this.marketStartTimeETH > 0) {
+              this.ethStartPrice = price;
               console.log(`🎯 ETH perp start price set: $${price.toFixed(2)}`);
             }
           } else if (symbol === "SOLUSDT") {
-            this.binanceSolPrice = price;
+            this.solPrice = price;
             this.gbmSOL.addPrice(price);
 
-            if (
-              this.binanceSolStartPrice === 0 &&
-              this.marketStartTimeSOL > 0
-            ) {
-              this.binanceSolStartPrice = price;
+            if (this.solStartPrice === 0 && this.marketStartTimeSOL > 0) {
+              this.solStartPrice = price;
               console.log(`🎯 SOL perp start price set: $${price.toFixed(4)}`);
             }
           } else if (symbol === "XRPUSDT") {
-            this.binanceXrpPrice = price;
+            this.xrpPrice = price;
             this.gbmXRP.addPrice(price);
 
-            if (
-              this.binanceXrpStartPrice === 0 &&
-              this.marketStartTimeXRP > 0
-            ) {
-              this.binanceXrpStartPrice = price;
+            if (this.xrpStartPrice === 0 && this.marketStartTimeXRP > 0) {
+              this.xrpStartPrice = price;
               console.log(`🎯 XRP perp start price set: $${price.toFixed(4)}`);
             }
           }
@@ -978,230 +708,6 @@ class AutoTradingBot {
     connect();
   }
 
-  // === BYBIT — All 4 assets ===
-  private connectBybitPerpTradeWS() {
-    const WS_URL = "wss://stream.bybit.com/v5/public/linear";
-    let reconnectAttempts = 0;
-
-    const connect = () => {
-      if (!this.running) return;
-      this.bybitWs?.terminate();
-      this.bybitWs = new WebSocket(WS_URL);
-
-      this.bybitWs.on("open", () => {
-        reconnectAttempts = 0;
-        console.log("✅ Bybit Perpetual TRADE WS connected (BTC/ETH/SOL/XRP)");
-        this.bybitWs!.send(
-          JSON.stringify({
-            op: "subscribe",
-            args: [
-              "publicTrade.BTCUSDT",
-              "publicTrade.ETHUSDT",
-              "publicTrade.SOLUSDT",
-              "publicTrade.XRPUSDT",
-            ],
-          })
-        );
-      });
-
-      this.bybitWs.on("message", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.topic?.startsWith("publicTrade.") && msg.data) {
-            for (const trade of msg.data) {
-              const symbol = trade.s;
-              const price = parseFloat(trade.p);
-              if (price <= 0) continue;
-
-              switch (symbol) {
-                case "BTCUSDT":
-                  this.bybitBtcPrice = price;
-                  if (this.bybitStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.bybitStartPrices.BTC = this.binanceBtcStartPrice;
-                  break;
-                case "ETHUSDT":
-                  this.bybitEthPrice = price;
-                  if (this.bybitStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.bybitStartPrices.ETH = this.binanceEthStartPrice;
-                  break;
-                case "SOLUSDT":
-                  this.bybitSolPrice = price;
-                  if (this.bybitStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.bybitStartPrices.SOL = this.binanceSolStartPrice;
-                  break;
-                case "XRPUSDT":
-                  this.bybitXrpPrice = price;
-                  if (this.bybitStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.bybitStartPrices.XRP = this.binanceXrpStartPrice;
-                  break;
-              }
-              this.render();
-            }
-          }
-        } catch {}
-      });
-
-      this.bybitWs.on("close", () => {
-        console.log("🔌 Bybit WS closed → reconnecting...");
-        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
-      });
-
-      this.bybitWs.on("error", () => this.bybitWs?.close());
-    };
-
-    connect();
-  }
-
-  // === GATE.IO — All 4 assets ===
-  private connectGatePerpTradeWS() {
-    const WS_URL = "wss://fx-ws.gateio.ws/v4/ws/usdt";
-    let reconnectAttempts = 0;
-
-    const connect = () => {
-      if (!this.running) return;
-      this.gateWs?.terminate();
-      this.gateWs = new WebSocket(WS_URL);
-
-      this.gateWs.on("open", () => {
-        reconnectAttempts = 0;
-        console.log(
-          "✅ Gate.io Perpetual TRADE WS connected (BTC/ETH/SOL/XRP)"
-        );
-        this.gateWs!.send(
-          JSON.stringify({
-            time: Math.floor(Date.now() / 1000),
-            channel: "futures.trades",
-            event: "subscribe",
-            payload: ["BTC_USDT", "ETH_USDT", "SOL_USDT", "XRP_USDT"],
-          })
-        );
-      });
-
-      this.gateWs.on("message", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (
-            msg.channel === "futures.trades" &&
-            msg.event === "update" &&
-            msg.result
-          ) {
-            for (const trade of msg.result) {
-              const contract = trade.contract;
-              const price = parseFloat(trade.price);
-              if (price <= 0) continue;
-
-              switch (contract) {
-                case "BTC_USDT":
-                  this.gateBtcPrice = price;
-                  if (this.gateStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.gateStartPrices.BTC = this.binanceBtcStartPrice;
-                  break;
-                case "ETH_USDT":
-                  this.gateEthPrice = price;
-                  if (this.gateStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.gateStartPrices.ETH = this.binanceEthStartPrice;
-                  break;
-                case "SOL_USDT":
-                  this.gateSolPrice = price;
-                  if (this.gateStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.gateStartPrices.SOL = this.binanceSolStartPrice;
-                  break;
-                case "XRP_USDT":
-                  this.gateXrpPrice = price;
-                  if (this.gateStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.gateStartPrices.XRP = this.binanceXrpStartPrice;
-                  break;
-              }
-              this.render();
-            }
-          }
-        } catch {}
-      });
-
-      this.gateWs.on("close", () => {
-        console.log("🔌 Gate.io WS closed → reconnecting...");
-        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
-      });
-
-      this.gateWs.on("error", () => this.gateWs?.close());
-    };
-
-    connect();
-  }
-
-  // === OKX — All 4 assets ===
-  private connectOKXPerpTradeWS() {
-    const WS_URL = "wss://ws.okx.com:8443/ws/v5/public";
-    let reconnectAttempts = 0;
-
-    const connect = () => {
-      if (!this.running) return;
-      this.okxWs?.terminate();
-      this.okxWs = new WebSocket(WS_URL);
-
-      this.okxWs.on("open", () => {
-        reconnectAttempts = 0;
-        console.log("✅ OKX Perpetual TRADE WS connected (BTC/ETH/SOL/XRP)");
-        this.okxWs!.send(
-          JSON.stringify({
-            op: "subscribe",
-            args: [
-              { channel: "trades", instId: "BTC-USDT-SWAP" },
-              { channel: "trades", instId: "ETH-USDT-SWAP" },
-              { channel: "trades", instId: "SOL-USDT-SWAP" },
-              { channel: "trades", instId: "XRP-USDT-SWAP" },
-            ],
-          })
-        );
-      });
-
-      this.okxWs.on("message", (data) => {
-        try {
-          const msg = JSON.parse(data.toString());
-          if (msg.arg?.channel === "trades" && msg.data) {
-            for (const trade of msg.data) {
-              const instId = trade.instId;
-              const price = parseFloat(trade.px);
-              if (price <= 0) continue;
-
-              switch (instId) {
-                case "BTC-USDT-SWAP":
-                  this.okxBtcPrice = price;
-                  if (this.okxStartPrices.BTC === 0 && this.binanceBtcStartPrice > 0)
-                    this.okxStartPrices.BTC = this.binanceBtcStartPrice;
-                  break;
-                case "ETH-USDT-SWAP":
-                  this.okxEthPrice = price;
-                  if (this.okxStartPrices.ETH === 0 && this.binanceEthStartPrice > 0)
-                    this.okxStartPrices.ETH = this.binanceEthStartPrice;
-                  break;
-                case "SOL-USDT-SWAP":
-                  this.okxSolPrice = price;
-                  if (this.okxStartPrices.SOL === 0 && this.binanceSolStartPrice > 0)
-                    this.okxStartPrices.SOL = this.binanceSolStartPrice;
-                  break;
-                case "XRP-USDT-SWAP":
-                  this.okxXrpPrice = price;
-                  if (this.okxStartPrices.XRP === 0 && this.binanceXrpStartPrice > 0)
-                    this.okxStartPrices.XRP = this.binanceXrpStartPrice;
-                  break;
-              }
-              this.render();
-            }
-          }
-        } catch {}
-      });
-
-      this.okxWs.on("close", () => {
-        console.log("🔌 OKX WS closed → reconnecting...");
-        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
-      });
-
-      this.okxWs.on("error", () => this.okxWs?.close());
-    };
-
-    connect();
-  }
   private connectPolymarket() {
     let reconnectAttempts = 0;
     const connect = () => {
@@ -1258,180 +764,91 @@ class AutoTradingBot {
   private processPolymarketMessage(msg: any) {
     const changes = msg.price_changes || msg;
     const list = Array.isArray(changes) ? changes : [msg];
-
     for (const c of list) {
       const id = c.asset_id || c.assetId;
       const bid = parseFloat(c.best_bid || c.bid || "0");
       const ask = parseFloat(c.best_ask || c.ask || "0");
-      const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
+      const mid = bid && ask ? (bid + ask) / 2 : 0;
+      if (!id || mid === 0) continue;
 
-      if (!id || mid <= 0) continue;
-
-      let symbol: AssetSymbol | null = null;
-
-      if (id === this.tokenIdUp) {
-        symbol = "BTC";
+      if (id === this.tokenIdUp)
         Object.assign(this.book.BTC.UP, { bid, ask, mid });
-      } else if (id === this.tokenIdDown) {
-        symbol = "BTC";
+      if (id === this.tokenIdDown)
         Object.assign(this.book.BTC.DOWN, { bid, ask, mid });
-      } else if (id === this.tokenIdUpETH) {
-        symbol = "ETH";
+      if (id === this.tokenIdUpETH)
         Object.assign(this.book.ETH.UP, { bid, ask, mid });
-      } else if (id === this.tokenIdDownETH) {
-        symbol = "ETH";
+      if (id === this.tokenIdDownETH)
         Object.assign(this.book.ETH.DOWN, { bid, ask, mid });
-      } else if (id === this.tokenIdUpSOL) {
-        symbol = "SOL";
+      if (id === this.tokenIdUpSOL)
         Object.assign(this.book.SOL.UP, { bid, ask, mid });
-      } else if (id === this.tokenIdDownSOL) {
-        symbol = "SOL";
+      if (id === this.tokenIdDownSOL)
         Object.assign(this.book.SOL.DOWN, { bid, ask, mid });
-      } else if (id === this.tokenIdUpXRP) {
-        symbol = "XRP";
+      if (id === this.tokenIdUpXRP)
         Object.assign(this.book.XRP.UP, { bid, ask, mid });
-      } else if (id === this.tokenIdDownXRP) {
-        symbol = "XRP";
+      if (id === this.tokenIdDownXRP)
         Object.assign(this.book.XRP.DOWN, { bid, ask, mid });
-      }
-
-      if (symbol) {
-        const hist = this.polyHistory[symbol];
-        hist.push({
-          ts: Date.now(),
-          up: this.book[symbol].UP.mid,
-          down: this.book[symbol].DOWN.mid,
-        });
-        if (hist.length > 600) hist.shift();
-      }
     }
-
-    // ─────────────────────────────────────
-    // Feed Polymarket → GBM calibration
-    // ─────────────────────────────────────
-
     this.render();
-  }
-
-  private getPolyRecentChange(
-    symbol: AssetSymbol,
-    ms: number,
-    dir: "up" | "down"
-  ): number {
-    const hist = this.polyHistory[symbol];
-    if (hist.length < 2) return 999;
-    const now = hist[hist.length - 1].ts;
-    const target = now - ms;
-    const pastEntry = [...hist].reverse().find((p) => p.ts <= target);
-    if (!pastEntry) return 999;
-    const curr = hist[hist.length - 1][dir];
-    const past = pastEntry[dir];
-    return Math.abs(curr - past);
   }
 
   private updateFairProbs() {
     const now = Date.now();
 
-    this.updateHybridFair("BTC", now);
-    this.updateHybridFair("ETH", now);
-    this.updateHybridFair("SOL", now);
-    this.updateHybridFair("XRP", now);
-  }
-
-  private updateHybridFair(symbol: AssetSymbol, now: number) {
-    const gbm =
-      symbol === "BTC"
-        ? this.gbmBTC
-        : symbol === "ETH"
-        ? this.gbmETH
-        : symbol === "SOL"
-        ? this.gbmSOL
-        : this.gbmXRP;
-
-    const currentPrice =
-      symbol === "BTC"
-        ? this.binanceBtcPrice
-        : symbol === "ETH"
-        ? this.binanceEthPrice
-        : symbol === "SOL"
-        ? this.binanceSolPrice
-        : this.binanceXrpPrice;
-
-    const startPrice =
-      symbol === "BTC"
-        ? this.binanceBtcStartPrice
-        : symbol === "ETH"
-        ? this.binanceEthStartPrice
-        : symbol === "SOL"
-        ? this.binanceSolStartPrice
-        : this.binanceXrpStartPrice;
-
-    const marketStartTime =
-      symbol === "BTC"
-        ? this.marketStartTimeBTC
-        : symbol === "ETH"
-        ? this.marketStartTimeETH
-        : symbol === "SOL"
-        ? this.marketStartTimeSOL
-        : this.marketStartTimeXRP;
-
-    if (currentPrice <= 0 || startPrice <= 0 || marketStartTime <= 0) return;
-
-    const minsLeft = (marketStartTime + 900000 - now) / 60000;
-    if (minsLeft <= 0) return;
-
-    // Compute pure GBM fair
-    const gbmFair = gbm.calculate(currentPrice, startPrice, minsLeft);
-
-    // Get poly mids
-    const polyUp = this.book[symbol].UP.mid;
-    const polyDown = this.book[symbol].DOWN.mid;
-    if (polyUp <= 0 || polyDown <= 0) return;
-
-    // Detect recent spike
-    const recentPct = gbm.getRecentPctChange(this.spikeWindowMs);
-    const spikeMagnitude = Math.abs(recentPct);
-    const isSpike = spikeMagnitude > this.spikeThresh[symbol];
-
-    // Get past price for accurate pastDelta
-    const pastPrice = gbm.getRecentPrice(this.spikeWindowMs);
-    const pastDelta =
-      startPrice > 0 ? ((pastPrice - startPrice) / startPrice) * 100 : 0;
-    const currDelta =
-      startPrice > 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
-
-    // Check if spike flipped delta sign
-    const flippedSign =
-      Math.sign(pastDelta) !== Math.sign(currDelta) &&
-      spikeMagnitude > this.spikeThresh[symbol] * 0.5;
-
-    // Blending alpha: 1 = full poly, 0 = full GBM
-    let alpha = isSpike ? 0 : 1; // Binary for now; could smooth: alpha = 1 / (1 + spikeMagnitude / thresh)
-
-    // Hybrid UP
-    let hybridUp = (1 - alpha) * gbmFair.UP + alpha * polyUp;
-
-    // Amplify for sign-flip spikes
-    if (isSpike && flippedSign) {
-      const direction = recentPct > 0 ? 1 : -1;
-      hybridUp += direction * this.flipBonus;
+    if (
+      this.btcPrice > 1000 &&
+      this.btcStartPrice > 1000 &&
+      this.marketStartTimeBTC > 0
+    ) {
+      const minsLeft = (this.marketStartTimeBTC + 900000 - now) / 60000;
+      if (minsLeft > 0)
+        this.fairProbs.BTC = this.gbmBTC.calculate(
+          this.btcPrice,
+          this.btcStartPrice,
+          minsLeft
+        );
     }
 
-    // Apply certainty clip to avoid overestimation of reversal
-    const logRatio = Math.log(currentPrice / startPrice);
-    const sigma = gbm.estimateVolatilityPerMinute();
-    const tau = minsLeft || 0.001; // avoid div0
-    const certainty = Math.abs(logRatio) / (sigma * Math.sqrt(tau));
-    if (certainty > this.certaintyThresh) {
-      hybridUp = logRatio > 0 ? 0.999 : 0.001;
+    if (
+      this.ethPrice > 100 &&
+      this.ethStartPrice > 100 &&
+      this.marketStartTimeETH > 0
+    ) {
+      const minsLeft = (this.marketStartTimeETH + 900000 - now) / 60000;
+      if (minsLeft > 0)
+        this.fairProbs.ETH = this.gbmETH.calculate(
+          this.ethPrice,
+          this.ethStartPrice,
+          minsLeft
+        );
     }
 
-    hybridUp = Math.max(0.001, Math.min(0.999, hybridUp));
+    if (
+      this.solPrice > 1 &&
+      this.solStartPrice > 1 &&
+      this.marketStartTimeSOL > 0
+    ) {
+      const minsLeft = (this.marketStartTimeSOL + 900000 - now) / 60000;
+      if (minsLeft > 0)
+        this.fairProbs.SOL = this.gbmSOL.calculate(
+          this.solPrice,
+          this.solStartPrice,
+          minsLeft
+        );
+    }
 
-    this.fairProbs[symbol] = {
-      UP: hybridUp,
-      DOWN: 1 - hybridUp,
-    };
+    if (
+      this.xrpPrice > 0.1 &&
+      this.xrpStartPrice > 0.1 &&
+      this.marketStartTimeXRP > 0
+    ) {
+      const minsLeft = (this.marketStartTimeXRP + 900000 - now) / 60000;
+      if (minsLeft > 0)
+        this.fairProbs.XRP = this.gbmXRP.calculate(
+          this.xrpPrice,
+          this.xrpStartPrice,
+          minsLeft
+        );
+    }
   }
 
   private fmtPct(p: number): string {
@@ -1439,91 +856,32 @@ class AutoTradingBot {
   }
 
   private recordPlotPoint(symbol: AssetSymbol) {
-    const now = Date.now();
-
-    const fair = this.fairProbs[symbol];
-    const book = this.book[symbol];
-
-    // Binance prices & start
-    const binancePrice =
-      symbol === "BTC"
-        ? this.binanceBtcPrice
-        : symbol === "ETH"
-        ? this.binanceEthPrice
-        : symbol === "SOL"
-        ? this.binanceSolPrice
-        : this.binanceXrpPrice;
-
-    const binanceStart =
-      symbol === "BTC"
-        ? this.binanceBtcStartPrice
-        : symbol === "ETH"
-        ? this.binanceEthStartPrice
-        : symbol === "SOL"
-        ? this.binanceSolStartPrice
-        : this.binanceXrpStartPrice;
-
-    // Other exchanges
-    const bybitPrice =
-      symbol === "BTC"
-        ? this.bybitBtcPrice
-        : symbol === "ETH"
-        ? this.bybitEthPrice
-        : symbol === "SOL"
-        ? this.bybitSolPrice
-        : this.bybitXrpPrice;
-
-    const gatePrice =
-      symbol === "BTC"
-        ? this.gateBtcPrice
-        : symbol === "ETH"
-        ? this.gateEthPrice
-        : symbol === "SOL"
-        ? this.gateSolPrice
-        : this.gateXrpPrice;
-
-    const okxPrice =
-      symbol === "BTC"
-        ? this.okxBtcPrice
-        : symbol === "ETH"
-        ? this.okxEthPrice
-        : symbol === "SOL"
-        ? this.okxSolPrice
-        : this.okxXrpPrice;
-
-    const bybitStart = this.bybitStartPrices[symbol];
-    const gateStart = this.gateStartPrices[symbol];
-    const okxStart = this.okxStartPrices[symbol];
-
-    const binanceDelta =
-      binanceStart > 0
-        ? ((binancePrice - binanceStart) / binanceStart) * 100
-        : 0;
-    const bybitDelta =
-      bybitStart > 0 ? ((bybitPrice - bybitStart) / bybitStart) * 100 : 0;
-    const gateDelta =
-      gateStart > 0 ? ((gatePrice - gateStart) / gateStart) * 100 : 0;
-    const okxDelta =
-      okxStart > 0 ? ((okxPrice - okxStart) / okxStart) * 100 : 0;
-
+    const fair = this.fairProbs[symbol].UP * 100;
+    const poly = this.book[symbol].UP.mid * 100;
+    const edge = fair - poly;
+  
+    const startPrice = this[`${symbol.toLowerCase()}StartPrice` as any];
+    const price = this[`${symbol.toLowerCase()}Price` as any];
+  
+    const pctDelta =
+      startPrice > 0 ? ((price - startPrice) / startPrice) * 100 : 0;
+  
     this.plotBuffers[symbol].add({
-      ts: now,
-      pctDelta: binanceDelta,
-
-      deltaBybit: bybitDelta,
-      deltaGate: gateDelta,
-      deltaOkx: okxDelta,
-
-      fairUp: fair.UP * 100,
-      fairDown: fair.DOWN * 100,
-
-      polyUp: book.UP.mid * 100,
-      polyDown: book.DOWN.mid * 100,
-
-      edgeUp: (fair.UP - book.UP.mid) * 100,
-      edgeDown: (fair.DOWN - book.DOWN.mid) * 100,
+      ts: Date.now(),
+      fair,
+      poly,
+      edge,
+      pctDelta,
     });
   }
+
+  private onSecondTick() {
+    this.recordPlotPoint("BTC");
+    this.recordPlotPoint("ETH");
+    this.recordPlotPoint("SOL");
+    this.recordPlotPoint("XRP");
+  }
+
   private render() {
     const DASHBOARD_LINES = 17;
 
@@ -1558,46 +916,30 @@ class AutoTradingBot {
 
     // ───── price deltas ─────
     const btcDelta =
-      this.binanceBtcStartPrice > 0
-        ? this.binanceBtcPrice - this.binanceBtcStartPrice
-        : 0;
+      this.btcStartPrice > 0 ? this.btcPrice - this.btcStartPrice : 0;
     const btcPct =
-      this.binanceBtcStartPrice > 0
-        ? (btcDelta / this.binanceBtcStartPrice) * 100
-        : 0;
+      this.btcStartPrice > 0 ? (btcDelta / this.btcStartPrice) * 100 : 0;
     const btcColor = btcDelta >= 0 ? GREEN : RED;
     const btcArrow = btcDelta >= 0 ? "▲" : "▼";
 
     const ethDelta =
-      this.binanceEthStartPrice > 0
-        ? this.binanceEthPrice - this.binanceEthStartPrice
-        : 0;
+      this.ethStartPrice > 0 ? this.ethPrice - this.ethStartPrice : 0;
     const ethPct =
-      this.binanceEthStartPrice > 0
-        ? (ethDelta / this.binanceEthStartPrice) * 100
-        : 0;
+      this.ethStartPrice > 0 ? (ethDelta / this.ethStartPrice) * 100 : 0;
     const ethColor = ethDelta >= 0 ? GREEN : RED;
     const ethArrow = ethDelta >= 0 ? "▲" : "▼";
 
     const solDelta =
-      this.binanceSolStartPrice > 0
-        ? this.binanceSolPrice - this.binanceSolStartPrice
-        : 0;
+      this.solStartPrice > 0 ? this.solPrice - this.solStartPrice : 0;
     const solPct =
-      this.binanceSolStartPrice > 0
-        ? (solDelta / this.binanceSolStartPrice) * 100
-        : 0;
+      this.solStartPrice > 0 ? (solDelta / this.solStartPrice) * 100 : 0;
     const solColor = solDelta >= 0 ? GREEN : RED;
     const solArrow = solDelta >= 0 ? "▲" : "▼";
 
     const xrpDelta =
-      this.binanceXrpStartPrice > 0
-        ? this.binanceXrpPrice - this.binanceXrpStartPrice
-        : 0;
+      this.xrpStartPrice > 0 ? this.xrpPrice - this.xrpStartPrice : 0;
     const xrpPct =
-      this.binanceXrpStartPrice > 0
-        ? (xrpDelta / this.binanceXrpStartPrice) * 100
-        : 0;
+      this.xrpStartPrice > 0 ? (xrpDelta / this.xrpStartPrice) * 100 : 0;
     const xrpColor = xrpDelta >= 0 ? GREEN : RED;
     const xrpArrow = xrpDelta >= 0 ? "▲" : "▼";
 
@@ -1608,13 +950,13 @@ class AutoTradingBot {
 
       `║ ${COLOR_BTC}BTC${RESET} • ${btcLeft
         .toString()
-        .padEnd(3)}s left │ $${this.binanceBtcPrice
+        .padEnd(3)}s left │ $${this.btcPrice
         .toFixed(2)
         .padEnd(10)} ${btcColor}${btcArrow}${RESET} ${btcColor}${btcDelta
         .toFixed(2)
-        .padEnd(7)}${RESET} ${btcColor}(${btcPct.toFixed(3)}%)${"".padEnd(
-        13
-      )}${RESET}║`,
+        .padEnd(7)}${RESET} ${btcColor}(${btcPct.toFixed(
+        3
+      )}%)${RESET}            ║`,
 
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         this.fairProbs.BTC.UP
@@ -1636,13 +978,13 @@ class AutoTradingBot {
 
       `║ ${COLOR_ETH}ETH${RESET} • ${ethLeft
         .toString()
-        .padEnd(3)}s left │ $${this.binanceEthPrice
+        .padEnd(3)}s left │ $${this.ethPrice
         .toFixed(2)
         .padEnd(10)} ${ethColor}${ethArrow}${RESET} ${ethColor}${ethDelta
         .toFixed(2)
-        .padEnd(7)}${RESET} ${ethColor}(${ethPct.toFixed(3)}%)${"".padEnd(
-        13
-      )}${RESET}║`,
+        .padEnd(7)}${RESET} ${ethColor}(${ethPct.toFixed(
+        3
+      )}%)${RESET}           ║`,
 
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         this.fairProbs.ETH.UP
@@ -1664,13 +1006,13 @@ class AutoTradingBot {
 
       `║ ${COLOR_SOL}SOL${RESET} • ${solLeft
         .toString()
-        .padEnd(3)}s left │ $${this.binanceSolPrice
+        .padEnd(3)}s left │ $${this.solPrice
         .toFixed(4)
         .padEnd(10)} ${solColor}${solArrow}${RESET} ${solColor}${solDelta
         .toFixed(4)
-        .padEnd(7)}${RESET} ${solColor}(${solPct.toFixed(3)}%)${"".padEnd(
-        13
-      )}${RESET}║`,
+        .padEnd(7)}${RESET} ${solColor}(${solPct.toFixed(
+        3
+      )}%)${RESET}          ║`,
 
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         this.fairProbs.SOL.UP
@@ -1692,13 +1034,13 @@ class AutoTradingBot {
 
       `║ ${COLOR_XRP}XRP${RESET} • ${xrpLeft
         .toString()
-        .padEnd(3)}s left │ $${this.binanceXrpPrice
+        .padEnd(3)}s left │ $${this.xrpPrice
         .toFixed(4)
         .padEnd(10)} ${xrpColor}${xrpArrow}${RESET} ${xrpColor}${xrpDelta
         .toFixed(4)
-        .padEnd(7)}${RESET} ${xrpColor}(${xrpPct.toFixed(3)}%)${"".padEnd(
-        13
-      )}${RESET}║`,
+        .padEnd(7)}${RESET} ${xrpColor}(${xrpPct.toFixed(
+        3
+      )}%)${RESET}          ║`,
 
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         this.fairProbs.XRP.UP
@@ -1804,112 +1146,44 @@ class AutoTradingBot {
     const fair = this.fairProbs[symbol];
     const poly = this.book[symbol];
 
-    const startPrice =
-      symbol === "BTC"
-        ? this.binanceBtcStartPrice
-        : symbol === "ETH"
-        ? this.binanceEthStartPrice
-        : symbol === "SOL"
-        ? this.binanceSolStartPrice
-        : this.binanceXrpStartPrice;
-
-    const currentPrice =
-      symbol === "BTC"
-        ? this.binanceBtcPrice
-        : symbol === "ETH"
-        ? this.binanceEthPrice
-        : symbol === "SOL"
-        ? this.binanceSolPrice
-        : this.binanceXrpPrice;
-
-    const pctDelta =
-      startPrice > 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
-
-    const marketStartTime =
-      symbol === "BTC"
-        ? this.marketStartTimeBTC
-        : symbol === "ETH"
-        ? this.marketStartTimeETH
-        : symbol === "SOL"
-        ? this.marketStartTimeSOL
-        : this.marketStartTimeXRP;
-
-    const minsLeft = Math.max(0, (marketStartTime + 900000 - now) / 60000);
-    if (minsLeft <= 0) return;
-
-    const gbm =
-      symbol === "BTC"
-        ? this.gbmBTC
-        : symbol === "ETH"
-        ? this.gbmETH
-        : symbol === "SOL"
-        ? this.gbmSOL
-        : this.gbmXRP;
-
-    const price_spike = gbm.getRecentPctChange(1000);
-
     let side: "UP" | "DOWN" | null = null;
-    if (price_spike > 0) side = "UP";
-    else if (price_spike < 0) side = "DOWN";
+
+    if (fair.UP - poly.UP.mid > this.priceThreshold) {
+      side = "UP";
+    } else if (fair.DOWN - poly.DOWN.mid > this.priceThreshold) {
+      side = "DOWN";
+    }
+
     if (!side) return;
 
-    const base_spike_thresh =
-      symbol === "BTC"
-        ? 0.03
-        : symbol === "ETH"
-        ? 0.05
-        : symbol === "SOL"
-        ? 0.08
-        : 0.1; // % per second, adjust per asset volatility
+    let tokenId: string | null = null;
 
-    const time_factor = minsLeft / 15; // 0 to 1, smaller near expiry
+    // Explicit routing per symbol
+    switch (symbol) {
+      case "BTC":
+        tokenId = side === "UP" ? this.tokenIdUp : this.tokenIdDown;
+        break;
 
-    const delta_scale = 1; // % delta scale
-    const delta_factor = 1 / (0.1 + Math.abs(pctDelta) / delta_scale); // higher when close to 0 delta (harder trigger)
+      case "ETH":
+        tokenId = side === "UP" ? this.tokenIdUpETH : this.tokenIdDownETH;
+        break;
 
-    const spike_thresh = base_spike_thresh * time_factor * delta_factor;
+      case "SOL":
+        tokenId = side === "UP" ? this.tokenIdUpSOL : this.tokenIdDownSOL;
+        break;
 
-    if (Math.abs(price_spike) > spike_thresh) {
-      const poly_dir: "up" | "down" = side === "UP" ? "up" : "down";
-      const poly_change = this.getPolyRecentChange(symbol, 1000, poly_dir);
-
-      const lag_thresh = 0.01; // 1% change in prob
-
-      if (poly_change < lag_thresh) {
-        const edge =
-          side === "UP" ? fair.UP - poly.UP.mid : fair.DOWN - poly.DOWN.mid;
-
-        if (edge > this.priceThreshold) {
-          let tokenId: string | null = null;
-
-          switch (symbol) {
-            case "BTC":
-              tokenId = side === "UP" ? this.tokenIdUp : this.tokenIdDown;
-              break;
-
-            case "ETH":
-              tokenId = side === "UP" ? this.tokenIdUpETH : this.tokenIdDownETH;
-              break;
-
-            case "SOL":
-              tokenId = side === "UP" ? this.tokenIdUpSOL : this.tokenIdDownSOL;
-              break;
-
-            case "XRP":
-              tokenId = side === "UP" ? this.tokenIdUpXRP : this.tokenIdDownXRP;
-              break;
-          }
-
-          if (!tokenId) return;
-
-          const price = poly[side].mid;
-          if (price <= 0) return;
-
-          this.executeTrade(symbol, tokenId, price);
-          this.lastTradeTime[symbol] = now;
-        }
-      }
+      case "XRP":
+        tokenId = side === "UP" ? this.tokenIdUpXRP : this.tokenIdDownXRP;
+        break;
     }
+
+    if (!tokenId) return;
+
+    const price = poly[side].mid;
+    if (price <= 0) return;
+
+    this.executeTrade(symbol, tokenId, price);
+    this.lastTradeTime[symbol] = now;
   }
 
   private async executeTrade(
