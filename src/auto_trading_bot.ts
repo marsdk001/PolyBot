@@ -526,11 +526,11 @@ class GBMFairProbability {
     const driftBoost = spikeDir * spikeSeverity * 0.4;
 
     const d =
-    (Math.log(currentPrice / startPrice) +
-      driftBoost -
-      baseSigma * baseSigma * 0.5 * tau) /
-    (baseSigma * Math.sqrt(tau));
-  
+      (Math.log(currentPrice / startPrice) +
+        driftBoost -
+        baseSigma * baseSigma * 0.5 * tau) /
+      (baseSigma * Math.sqrt(tau));
+
     let fairUp = this.normCDF(d);
     fairUp = Math.max(0.001, Math.min(0.999, fairUp));
 
@@ -2541,7 +2541,17 @@ class AutoTradingBot {
 
       const adjustment = severity * spikeDir * dynamicBlend;
 
-      let hybridUp = polyUp * (1 + adjustment);
+      // 1️⃣ Exchange-driven GBM fair (like old version)
+      const gbmFair = gbmEx.calculate(currentPrice, startPrice, minsLeft).UP;
+
+      // 2️⃣ Apply spike as a directional impulse to GBM
+      let hybridUp = gbmFair * (1 + adjustment);
+
+      // 3️⃣ Gentle pull toward Poly only when no strong impulse
+      const impulseStrength = Math.min(1, Math.abs(adjustment) / 0.05); // tune later
+      hybridUp = impulseStrength * hybridUp + (1 - impulseStrength) * polyUp;
+
+      // 4️⃣ Clamp
       hybridUp = Math.max(0.001, Math.min(0.999, hybridUp));
 
       this.hybridFairs[symbol][exch] = { UP: hybridUp, DOWN: 1 - hybridUp };
@@ -2768,27 +2778,29 @@ class AutoTradingBot {
     includeBinance = false
   ): number {
     const hybridMap = this.hybridFairs[symbol];
-  
+
     const activeHybrids = Object.entries(hybridMap)
       .filter(([exch, fair]) => {
         // Skip Binance if requested
         if (!includeBinance && exch === "BINANCE") return false;
-  
+
         // Skip inactive exchanges (no real price data)
         if (exch === "ASTER" || exch === "HYPER") return false;
-  
+
         // Optional: skip if hybrid is exactly neutral (never updated)
         if (fair.UP === 0.5 && fair.DOWN === 0.5) return false;
-  
+
         return true;
       })
       .map(([, fair]) => fair.UP);
-  
+
     if (activeHybrids.length === 0) return this.book[symbol].UP.mid || 0.5;
-  
-    return activeHybrids.reduce((sum, up) => sum + up, 0) / activeHybrids.length;
+
+    return (
+      activeHybrids.reduce((sum, up) => sum + up, 0) / activeHybrids.length
+    );
   }
-  
+
   private render() {
     const DASHBOARD_LINES = 17;
 
