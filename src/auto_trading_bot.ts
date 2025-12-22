@@ -39,18 +39,6 @@ type PlotPoint = {
   // Base delta (Binance reference)
   pctDelta: number;
 
-  // 🔹 NEW: Per-exchange Poly-spike hybrid fairs (UP probability %)
-  hybridBinance?: number;
-  hybridBybit?: number;
-  hybridGate?: number;
-  hybridOkx?: number;
-  hybridMexc?: number;
-  hybridBitget?: number;
-  hybridDeepcoin?: number;
-
-  // Optional: Consensus hybrid (the one you show in dashboard)
-  hybridConsensus?: number;
-
   // Per-exchange deltas
   deltaBybit?: number;
   deltaGate?: number;
@@ -146,91 +134,14 @@ class PlotBuffer {
     // Prepare Plotly traces
     // Prepare Plotly traces
     const traces = [
-      // ───────────── Poly + Spike Hybrid Fairs (per exchange) ─────────────
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridConsensus),
-        name: "Hybrid UP (Consensus)",
-        yaxis: "y1",
-        line: { dash: "solid", width: 3 },
-        visible: "legendonly",
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridBinance),
-        name: "Hybrid Binance",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridBybit),
-        name: "Hybrid Bybit",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridGate),
-        name: "Hybrid Gate",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridOkx),
-        name: "Hybrid OKX",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridMexc),
-        name: "Hybrid MEXC",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-
-      // ───────────── Per-exchange fair curves (legend-only) ─────────────
-      {
-        x: t,
-        y: this.data.map((d) => d.fairCombined),
-        name: "Combined Exchange Fair",
-        yaxis: "y1",
-        line: {
-          width: 1,
-          dash: "solid",
-        },
-      },      
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridBitget),
-        name: "Hybrid Bitget",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
-      {
-        x: t,
-        y: this.data.map((d) => d.hybridDeepcoin),
-        name: "Hybrid Deepcoin",
-        yaxis: "y1",
-        visible: "legendonly",
-        line: { dash: "dashdot" },
-      },
       // ───────────── Hybrid fair & poly ─────────────
       {
         x: t,
         y: this.data.map((d) => d.fairUp),
         name: "Fair UP (Hybrid)",
         yaxis: "y1",
-        visible: "legendonly",
         line: { dash: "solid", width: 3 },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -274,13 +185,73 @@ class PlotBuffer {
         visible: "legendonly",
       },
 
+      // ───────────── Per-exchange fair curves (legend-only) ─────────────
+      {
+        x: t,
+        y: this.data.map((d) => d.fairCombined),
+        name: "Combined Exchange Fair",
+        yaxis: "y1",
+        line: {
+          width: 1,
+          dash: "solid",
+        },
+      },      
+      {
+        x: t,
+        y: this.data.map((d) => d.fairBinance),
+        name: "Fair Binance",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairBybit),
+        name: "Fair Bybit",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairGate),
+        name: "Fair Gate",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairOkx),
+        name: "Fair OKX",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairMexc),
+        name: "Fair MEXC",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairBitget),
+        name: "Fair Bitget",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+      {
+        x: t,
+        y: this.data.map((d) => d.fairDeepcoin),
+        name: "Fair Deepcoin",
+        yaxis: "y1",
+        visible: "legendonly",
+      },
+
       // ───────────── Price deltas (% Δ) ─────────────
       {
         x: t,
         y: this.data.map((d) => d.pctDelta),
         name: "% Δ Binance",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 3, color: "#00ff00" },
         visible: "legendonly",
       },
@@ -289,7 +260,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaBybit),
         name: "% Δ Bybit",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#ff9900" },
         visible: "legendonly",
       },
@@ -298,7 +268,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaGate),
         name: "% Δ Gate.io",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#ff00ff" },
         visible: "legendonly",
       },
@@ -307,7 +276,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaOkx),
         name: "% Δ OKX",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#00ffff" },
         visible: "legendonly",
       },
@@ -318,7 +286,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaMexc),
         name: "% Δ MEXC",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#081b06" },
         visible: "legendonly",
       },
@@ -327,7 +294,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaBitget),
         name: "% Δ Bitget",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#00aa88" },
         visible: "legendonly",
       },
@@ -336,7 +302,6 @@ class PlotBuffer {
         y: this.data.map((d) => d.deltaDeepcoin),
         name: "% Δ Deepcoin",
         yaxis: "y2",
-        visible: "legendonly",
         line: { width: 2, color: "#8888ff" },
         visible: "legendonly",
       },
@@ -344,7 +309,7 @@ class PlotBuffer {
 
     // Layout with dual y-axes
     const layout = {
-      title: `${this.symbol} – 1 Minute Snapshot`,
+      title: `${this.symbol} – 5 Minute Snapshot`,
 
       hovermode: "x unified", // ← show all Y values at the same X
 
@@ -542,8 +507,8 @@ class GBMFairProbability {
     const baseSigma = this.estimateVolatilityPerMinute();
 
     // --- Spike / shock detection ---
-    const recentPct = Math.abs(this.getRecentPctChange(100)); // 2s shock
-    const spikeThreshold = 0.05; // % move considered a shock
+    const recentPct = Math.abs(this.getRecentPctChange(2000)); // 2s shock
+    const spikeThreshold = 0.15; // % move considered a shock
     const spikeSeverity = Math.min(1, recentPct / spikeThreshold);
 
     // --- Option-aware weighting ---
@@ -554,14 +519,12 @@ class GBMFairProbability {
     const shockWeight = spikeSeverity * Math.exp(-moneyness * 6) * timeFactor;
 
     // Inflate sigma (vega effect)
-    const spikeDir = Math.sign(recentPct);
-    const driftBoost = spikeDir * spikeSeverity * 0.4;
+    const effectiveSigma = baseSigma * (1 + shockWeight * 1.5);
 
     const d =
-      (Math.log(currentPrice / startPrice) +
-        driftBoost -
-        baseSigma * baseSigma * 0.5 * tau) /
-      (baseSigma * Math.sqrt(tau));
+      (Math.log(currentPrice / startPrice) -
+        effectiveSigma * effectiveSigma * 0.5 * tau) /
+      (effectiveSigma * Math.sqrt(tau));
 
     let fairUp = this.normCDF(d);
     fairUp = Math.max(0.001, Math.min(0.999, fairUp));
@@ -735,30 +698,6 @@ class AutoTradingBot {
     SOL: { UP: 0.5, DOWN: 0.5 },
     XRP: { UP: 0.5, DOWN: 0.5 },
   };
-
-  private hybridFairs: Record<
-    AssetSymbol,
-    Record<Exchange, { UP: number; DOWN: number }>
-  > = {
-    BTC: this.initHybridMap(),
-    ETH: this.initHybridMap(),
-    SOL: this.initHybridMap(),
-    XRP: this.initHybridMap(),
-  };
-
-  private initHybridMap(): Record<Exchange, { UP: number; DOWN: number }> {
-    return {
-      BINANCE: { UP: 0.5, DOWN: 0.5 },
-      BYBIT: { UP: 0.5, DOWN: 0.5 },
-      GATE: { UP: 0.5, DOWN: 0.5 },
-      OKX: { UP: 0.5, DOWN: 0.5 },
-      ASTER: { UP: 0.5, DOWN: 0.5 },
-      HYPER: { UP: 0.5, DOWN: 0.5 },
-      MEXC: { UP: 0.5, DOWN: 0.5 },
-      BITGET: { UP: 0.5, DOWN: 0.5 },
-      DEEPCOIN: { UP: 0.5, DOWN: 0.5 },
-    };
-  }
 
   // Polymarket book
   private book: Record<
@@ -1153,7 +1092,6 @@ class AutoTradingBot {
               )
                 this.binanceBtcStartPrice = price;
               this.updateFairForExchange("BTC", "BINANCE");
-              this.updateHybridPerExchange("BTC", "BINANCE");
               break;
 
             case "ETHUSDT":
@@ -1165,7 +1103,6 @@ class AutoTradingBot {
               )
                 this.binanceEthStartPrice = price;
               this.updateFairForExchange("ETH", "BINANCE");
-              this.updateHybridPerExchange("ETH", "BINANCE");
               break;
 
             case "SOLUSDT":
@@ -1177,7 +1114,6 @@ class AutoTradingBot {
               )
                 this.binanceSolStartPrice = price;
               this.updateFairForExchange("SOL", "BINANCE");
-              this.updateHybridPerExchange("SOL", "BINANCE");
               break;
 
             case "XRPUSDT":
@@ -1189,7 +1125,6 @@ class AutoTradingBot {
               )
                 this.binanceXrpStartPrice = price;
               this.updateFairForExchange("XRP", "BINANCE");
-              this.updateHybridPerExchange("XRP", "BINANCE");
               break;
           }
 
@@ -1250,7 +1185,6 @@ class AutoTradingBot {
             this.binanceBtcPrice = price;
             this.gbm.BTC.BINANCE.addPrice(price);
             this.updateFairForExchange("BTC", "BINANCE");
-            this.updateHybridPerExchange("BTC", "BINANCE");
             price;
 
             if (
@@ -1263,7 +1197,6 @@ class AutoTradingBot {
           } else if (symbol === "ETHUSDT") {
             this.binanceEthPrice = price;
             this.updateFairForExchange("ETH", "BINANCE");
-            this.updateHybridPerExchange("ETH", "BINANCE");
             this.gbm.ETH.BINANCE.addPrice(price);
 
             if (
@@ -1276,7 +1209,6 @@ class AutoTradingBot {
           } else if (symbol === "SOLUSDT") {
             this.binanceSolPrice = price;
             this.updateFairForExchange("SOL", "BINANCE");
-            this.updateHybridPerExchange("SOL", "BINANCE");
             this.gbm.SOL.BINANCE.addPrice(price);
 
             if (
@@ -1289,7 +1221,6 @@ class AutoTradingBot {
           } else if (symbol === "XRPUSDT") {
             this.binanceXrpPrice = price;
             this.updateFairForExchange("XRP", "BINANCE");
-            this.updateHybridPerExchange("XRP", "BINANCE");
             this.gbm.XRP.BINANCE.addPrice(price);
 
             if (
@@ -1362,7 +1293,6 @@ class AutoTradingBot {
                   this.bybitBtcPrice = price;
                   this.gbm.BTC.BYBIT.addPrice(price);
                   this.updateFairForExchange("BTC", "BYBIT");
-                  this.updateHybridPerExchange("BTC", "BYBIT");
                   if (this.bybitStartPrices.BTC === 0)
                     this.bybitStartPrices.BTC = price;
                   break;
@@ -1370,7 +1300,6 @@ class AutoTradingBot {
                   this.bybitEthPrice = price;
                   this.gbm.ETH.BYBIT.addPrice(price);
                   this.updateFairForExchange("ETH", "BYBIT");
-                  this.updateHybridPerExchange("ETH", "BYBIT");
                   if (this.bybitStartPrices.ETH === 0)
                     this.bybitStartPrices.ETH = price;
                   break;
@@ -1378,7 +1307,6 @@ class AutoTradingBot {
                   this.bybitSolPrice = price;
                   this.gbm.SOL.BYBIT.addPrice(price);
                   this.updateFairForExchange("SOL", "BYBIT");
-                  this.updateHybridPerExchange("SOL", "BYBIT");
                   if (this.bybitStartPrices.SOL === 0)
                     this.bybitStartPrices.SOL = price;
                   break;
@@ -1386,7 +1314,6 @@ class AutoTradingBot {
                   this.bybitXrpPrice = price;
                   this.gbm.XRP.BYBIT.addPrice(price);
                   this.updateFairForExchange("XRP", "BYBIT");
-                  this.updateHybridPerExchange("XRP", "BYBIT");
                   if (this.bybitStartPrices.XRP === 0)
                     this.bybitStartPrices.XRP = price;
                   break;
@@ -1451,7 +1378,6 @@ class AutoTradingBot {
                   this.gateBtcPrice = price;
                   this.gbm.BTC.GATE.addPrice(price);
                   this.updateFairForExchange("BTC", "GATE");
-                  this.updateHybridPerExchange("BTC", "GATE");
                   if (this.gateStartPrices.BTC === 0)
                     this.gateStartPrices.BTC = price;
                   break;
@@ -1459,7 +1385,6 @@ class AutoTradingBot {
                   this.gateEthPrice = price;
                   this.gbm.ETH.GATE.addPrice(price);
                   this.updateFairForExchange("ETH", "GATE");
-                  this.updateHybridPerExchange("ETH", "GATE");
                   if (this.gateStartPrices.ETH === 0)
                     this.gateStartPrices.ETH = price;
                   break;
@@ -1467,7 +1392,6 @@ class AutoTradingBot {
                   this.gateSolPrice = price;
                   this.gbm.SOL.GATE.addPrice(price);
                   this.updateFairForExchange("SOL", "GATE");
-                  this.updateHybridPerExchange("SOL", "GATE");
                   if (this.gateStartPrices.SOL === 0)
                     this.gateStartPrices.SOL = price;
                   break;
@@ -1475,7 +1399,6 @@ class AutoTradingBot {
                   this.gateXrpPrice = price;
                   this.gbm.XRP.GATE.addPrice(price);
                   this.updateFairForExchange("XRP", "GATE");
-                  this.updateHybridPerExchange("XRP", "GATE");
                   if (this.gateStartPrices.XRP === 0)
                     this.gateStartPrices.XRP = price;
                   break;
@@ -1537,7 +1460,6 @@ class AutoTradingBot {
                   this.okxBtcPrice = price;
                   this.gbm.BTC.OKX.addPrice(price);
                   this.updateFairForExchange("BTC", "OKX");
-                  this.updateHybridPerExchange("BTC", "OKX");
                   if (this.okxStartPrices.BTC === 0)
                     this.okxStartPrices.BTC = price;
                   break;
@@ -1545,7 +1467,6 @@ class AutoTradingBot {
                   this.okxEthPrice = price;
                   this.gbm.ETH.OKX.addPrice(price);
                   this.updateFairForExchange("ETH", "OKX");
-                  this.updateHybridPerExchange("ETH", "OKX");
                   if (this.okxStartPrices.ETH === 0)
                     this.okxStartPrices.ETH = price;
                   break;
@@ -1553,7 +1474,6 @@ class AutoTradingBot {
                   this.okxSolPrice = price;
                   this.gbm.SOL.OKX.addPrice(price);
                   this.updateFairForExchange("SOL", "OKX");
-                  this.updateHybridPerExchange("SOL", "OKX");
                   if (this.okxStartPrices.SOL === 0)
                     this.okxStartPrices.SOL = price;
                   break;
@@ -1561,7 +1481,6 @@ class AutoTradingBot {
                   this.okxXrpPrice = price;
                   this.gbm.XRP.OKX.addPrice(price);
                   this.updateFairForExchange("XRP", "OKX");
-                  this.updateHybridPerExchange("XRP", "OKX");
                   if (this.okxStartPrices.XRP === 0)
                     this.okxStartPrices.XRP = price;
                   break;
@@ -1634,7 +1553,6 @@ class AutoTradingBot {
               this.asterBtcPrice = price;
               this.gbm.BTC.ASTER.addPrice(price);
               this.updateFairForExchange("BTC", "ASTER");
-              this.updateHybridPerExchange("BTC", "ASTER");
               if (this.asterStartPrices.BTC === 0) {
                 this.asterStartPrices.BTC = price;
               }
@@ -1644,7 +1562,6 @@ class AutoTradingBot {
               this.asterEthPrice = price;
               this.gbm.ETH.ASTER.addPrice(price);
               this.updateFairForExchange("ETH", "ASTER");
-              this.updateHybridPerExchange("ETH", "ASTER");
               if (this.asterStartPrices.ETH === 0) {
                 this.asterStartPrices.ETH = price;
               }
@@ -1654,7 +1571,6 @@ class AutoTradingBot {
               this.asterSolPrice = price;
               this.gbm.SOL.ASTER.addPrice(price);
               this.updateFairForExchange("SOL", "ASTER");
-              this.updateHybridPerExchange("SOL", "ASTER");
               if (this.asterStartPrices.SOL === 0) {
                 this.asterStartPrices.SOL = price;
               }
@@ -1664,7 +1580,6 @@ class AutoTradingBot {
               this.asterXrpPrice = price;
               this.gbm.XRP.ASTER.addPrice(price);
               this.updateFairForExchange("XRP", "ASTER");
-              this.updateHybridPerExchange("XRP", "ASTER");
               if (this.asterStartPrices.XRP === 0) {
                 this.asterStartPrices.XRP = price;
               }
@@ -1730,7 +1645,6 @@ class AutoTradingBot {
                 this.hyperBtcPrice = price;
                 this.gbm.BTC.HYPER.addPrice(price);
                 this.updateFairForExchange("BTC", "HYPER");
-                this.updateHybridPerExchange("BTC", "HYPER");
                 if (this.hyperStartPrices.BTC === 0) {
                   this.hyperStartPrices.BTC = price;
                 }
@@ -1740,7 +1654,6 @@ class AutoTradingBot {
                 this.hyperEthPrice = price;
                 this.gbm.ETH.HYPER.addPrice(price);
                 this.updateFairForExchange("ETH", "HYPER");
-                this.updateHybridPerExchange("ETH", "HYPER");
                 if (this.hyperStartPrices.ETH === 0) {
                   this.hyperStartPrices.ETH = price;
                 }
@@ -1750,7 +1663,6 @@ class AutoTradingBot {
                 this.hyperSolPrice = price;
                 this.gbm.SOL.HYPER.addPrice(price);
                 this.updateFairForExchange("SOL", "HYPER");
-                this.updateHybridPerExchange("SOL", "HYPER");
                 if (this.hyperStartPrices.SOL === 0) {
                   this.hyperStartPrices.SOL = price;
                 }
@@ -1760,7 +1672,6 @@ class AutoTradingBot {
                 this.hyperXrpPrice = price;
                 this.gbm.XRP.HYPER.addPrice(price);
                 this.updateFairForExchange("XRP", "HYPER");
-                this.updateHybridPerExchange("XRP", "HYPER");
                 if (this.hyperStartPrices.XRP === 0) {
                   this.hyperStartPrices.XRP = price;
                 }
@@ -1832,7 +1743,6 @@ class AutoTradingBot {
                 this.mexcBtcPrice = price;
                 this.gbm.BTC.MEXC.addPrice(price);
                 this.updateFairForExchange("BTC", "MEXC");
-                this.updateHybridPerExchange("BTC", "MEXC");
                 if (this.mexcStartPrices.BTC === 0)
                   this.mexcStartPrices.BTC = price;
                 break;
@@ -1841,7 +1751,6 @@ class AutoTradingBot {
                 this.mexcEthPrice = price;
                 this.gbm.ETH.MEXC.addPrice(price);
                 this.updateFairForExchange("ETH", "MEXC");
-                this.updateHybridPerExchange("ETH", "MEXC");
                 if (this.mexcStartPrices.ETH === 0)
                   this.mexcStartPrices.ETH = price;
                 break;
@@ -1850,7 +1759,6 @@ class AutoTradingBot {
                 this.mexcSolPrice = price;
                 this.gbm.SOL.MEXC.addPrice(price);
                 this.updateFairForExchange("SOL", "MEXC");
-                this.updateHybridPerExchange("SOL", "MEXC");
                 if (this.mexcStartPrices.SOL === 0)
                   this.mexcStartPrices.SOL = price;
                 break;
@@ -1859,7 +1767,6 @@ class AutoTradingBot {
                 this.mexcXrpPrice = price;
                 this.gbm.XRP.MEXC.addPrice(price);
                 this.updateFairForExchange("XRP", "MEXC");
-                this.updateHybridPerExchange("XRP", "MEXC");
                 if (this.mexcStartPrices.XRP === 0)
                   this.mexcStartPrices.XRP = price;
                 break;
@@ -1944,8 +1851,7 @@ class AutoTradingBot {
                 this.gbm.BTC.BITGET.addPrice(price);
                 if (this.bitgetStartPrices.BTC === 0)
                   this.bitgetStartPrices.BTC = price;
-                this.updateFairForExchange("BTC", "BITGET");
-                this.updateHybridPerExchange("BTC", "BITGET");
+                this.updateFairForExchange("BTC", "BITGET"); // if using the new function
                 break;
               case "ETHUSDT":
                 this.bitgetEthPrice = price;
@@ -1953,7 +1859,6 @@ class AutoTradingBot {
                 if (this.bitgetStartPrices.ETH === 0)
                   this.bitgetStartPrices.ETH = price;
                 this.updateFairForExchange("ETH", "BITGET");
-                this.updateHybridPerExchange("ETH", "BITGET");
                 break;
               case "SOLUSDT":
                 this.bitgetSolPrice = price;
@@ -1961,7 +1866,6 @@ class AutoTradingBot {
                 if (this.bitgetStartPrices.SOL === 0)
                   this.bitgetStartPrices.SOL = price;
                 this.updateFairForExchange("SOL", "BITGET");
-                this.updateHybridPerExchange("SOL", "BITGET");
                 break;
               case "XRPUSDT":
                 this.bitgetXrpPrice = price;
@@ -1969,7 +1873,6 @@ class AutoTradingBot {
                 if (this.bitgetStartPrices.XRP === 0)
                   this.bitgetStartPrices.XRP = price;
                 this.updateFairForExchange("XRP", "BITGET");
-                this.updateHybridPerExchange("XRP", "BITGET");
                 break;
             }
 
@@ -1993,131 +1896,91 @@ class AutoTradingBot {
   private connectDeepcoinPerpTradeWS() {
     const WS_URL =
       "wss://stream.deepcoin.com/streamlet/trade/public/swap?platform=api";
-
     let reconnectAttempts = 0;
-    let pingInterval: NodeJS.Timeout | null = null;
 
     const connect = () => {
       if (!this.running) return;
+      this.deepcoinWs?.terminate();
+      this.deepcoinWs = new WebSocket(WS_URL);
 
-      // Gracefully close previous socket
-      if (this.deepcoinWs && this.deepcoinWs.readyState === WebSocket.OPEN) {
-        this.deepcoinWs.close();
-      }
-
-      const ws = new WebSocket(WS_URL);
-      this.deepcoinWs = ws;
-
-      ws.on("open", () => {
+      this.deepcoinWs.on("open", () => {
         reconnectAttempts = 0;
         console.log("✅ Deepcoin Perpetual TRADE WS connected");
 
-        // ── Subscribe to trade streams ───────────────────────────────────────
+        // Subscribe to trades for each symbol
         const symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT"];
-
         symbols.forEach((inst, idx) => {
-          ws.send(
+          this.deepcoinWs!.send(
             JSON.stringify({
               SendTopicAction: {
                 Action: "1",
                 FilterValue: `DeepCoin_${inst}`,
+                LocalNo: idx + 1,
+                ResumeNo: -2,
                 TopicID: "7",
-                LocalNo: Date.now() + idx, // unique per session
-                ResumeNo: -1, // do NOT resume
               },
             })
           );
         });
-
-        // ── Heartbeat (CRITICAL) ─────────────────────────────────────────────
-        pingInterval = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send("ping"); // ← REQUIRED FORMAT
-          }
-        }, 15000);
       });
 
-      // ── Message Handler ────────────────────────────────────────────────────
-      ws.on("message", (data) => {
+      this.deepcoinWs.on("message", (data) => {
         try {
           const msg = JSON.parse(data.toString());
 
-          // Deepcoin batches updates under msg.r
+          // Deepcoin returns an array of notifications under 'r'
           if (!Array.isArray(msg.r)) return;
 
-          for (const item of msg.r) {
-            const d = item?.d;
-            if (!d || !d.I || !d.N) continue;
+          msg.r.forEach((item: any) => {
+            const d = item.d;
+            if (!d || !d.I || !d.N) return; // I = instrument, N = last price
 
+            const symbol = d.I; // e.g., "BTCUSDT"
             const price = parseFloat(d.N);
-            if (!(price > 0)) continue;
+            if (!(price > 0)) return;
 
-            switch (d.I) {
+            switch (symbol) {
               case "BTCUSDT":
                 this.deepcoinBtcPrice = price;
                 this.gbm.BTC.DEEPCOIN.addPrice(price);
                 this.updateFairForExchange("BTC", "DEEPCOIN");
-                this.updateHybridPerExchange("BTC", "DEEPCOIN");
                 if (this.deepcoinStartPrices.BTC === 0)
                   this.deepcoinStartPrices.BTC = price;
                 break;
-
               case "ETHUSDT":
                 this.deepcoinEthPrice = price;
                 this.gbm.ETH.DEEPCOIN.addPrice(price);
                 this.updateFairForExchange("ETH", "DEEPCOIN");
-                this.updateHybridPerExchange("ETH", "DEEPCOIN");
                 if (this.deepcoinStartPrices.ETH === 0)
                   this.deepcoinStartPrices.ETH = price;
                 break;
-
               case "SOLUSDT":
                 this.deepcoinSolPrice = price;
                 this.gbm.SOL.DEEPCOIN.addPrice(price);
                 this.updateFairForExchange("SOL", "DEEPCOIN");
-                this.updateHybridPerExchange("SOL", "DEEPCOIN");
                 if (this.deepcoinStartPrices.SOL === 0)
                   this.deepcoinStartPrices.SOL = price;
                 break;
-
               case "XRPUSDT":
                 this.deepcoinXrpPrice = price;
                 this.gbm.XRP.DEEPCOIN.addPrice(price);
                 this.updateFairForExchange("XRP", "DEEPCOIN");
-                this.updateHybridPerExchange("XRP", "DEEPCOIN");
                 if (this.deepcoinStartPrices.XRP === 0)
                   this.deepcoinStartPrices.XRP = price;
                 break;
             }
-          }
+          });
 
           this.render();
-        } catch {
-          // swallow malformed packets
-        }
+        } catch {}
       });
 
-      // ── Close Handler (ONLY ONE) ────────────────────────────────────────────
-      ws.on("close", () => {
-        console.log("🔌 Deepcoin WS closed");
-
-        if (pingInterval) {
-          clearInterval(pingInterval);
-          pingInterval = null;
-        }
-
-        if (!this.running) return;
-
-        reconnectAttempts++;
-        const delay = Math.min(3000 * reconnectAttempts, 30000);
-
-        console.log(`🔁 Reconnecting Deepcoin in ${delay}ms`);
-        setTimeout(connect, delay);
+      this.deepcoinWs.on("close", () => {
+        console.log("🔌 Deepcoin WS closed → reconnecting...");
+        setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
       });
 
-      ws.on("error", () => {
-        ws.close();
-      });
+      this.deepcoinWs.on("error", () => this.deepcoinWs?.close());
     };
 
     connect();
@@ -2384,7 +2247,6 @@ class AutoTradingBot {
       Math.min(0.999, straddledUp)
     );
   }
-
   private updateHybridFair(symbol: AssetSymbol, now: number) {
     // ───────────────── GBM: BINANCE only (by design) ─────────────────
     const gbm = this.gbm[symbol].BINANCE;
@@ -2445,165 +2307,6 @@ class AutoTradingBot {
     this.fairProbs[symbol].DOWN = 1 - clampedUp;
   }
 
-  private updateHybridPerExchange(
-    symbol: AssetSymbol,
-    exchange?: Exchange,
-    now = Date.now()
-  ) {
-    const polyUp = this.book[symbol].UP.mid;
-    const polyDown = this.book[symbol].DOWN.mid;
-    if (polyUp <= 0 || polyDown <= 0) return;
-
-    const marketStartTime =
-      symbol === "BTC"
-        ? this.binanceStartTimeBTC
-        : symbol === "ETH"
-        ? this.binanceStartTimeETH
-        : symbol === "SOL"
-        ? this.binanceStartTimeSOL
-        : this.binanceStartTimeXRP;
-
-    if (marketStartTime <= 0) return;
-
-    const minsLeft = (marketStartTime + 900_000 - now) / 60_000;
-    if (minsLeft <= 0) return;
-
-    const exchangesToUpdate = exchange
-      ? [exchange]
-      : (Object.keys(this.gbm[symbol]) as Exchange[]);
-
-    exchangesToUpdate.forEach((exch) => {
-      const currentPriceMap: Record<Exchange, number> = {
-        BINANCE:
-          symbol === "BTC"
-            ? this.binanceBtcPrice
-            : symbol === "ETH"
-            ? this.binanceEthPrice
-            : symbol === "SOL"
-            ? this.binanceSolPrice
-            : this.binanceXrpPrice,
-        BYBIT:
-          symbol === "BTC"
-            ? this.bybitBtcPrice
-            : symbol === "ETH"
-            ? this.bybitEthPrice
-            : symbol === "SOL"
-            ? this.bybitSolPrice
-            : this.bybitXrpPrice,
-        GATE:
-          symbol === "BTC"
-            ? this.gateBtcPrice
-            : symbol === "ETH"
-            ? this.gateEthPrice
-            : symbol === "SOL"
-            ? this.gateSolPrice
-            : this.gateXrpPrice,
-        OKX:
-          symbol === "BTC"
-            ? this.okxBtcPrice
-            : symbol === "ETH"
-            ? this.okxEthPrice
-            : symbol === "SOL"
-            ? this.okxSolPrice
-            : this.okxXrpPrice,
-        MEXC:
-          symbol === "BTC"
-            ? this.mexcBtcPrice
-            : symbol === "ETH"
-            ? this.mexcEthPrice
-            : symbol === "SOL"
-            ? this.mexcSolPrice
-            : this.mexcXrpPrice,
-        BITGET:
-          symbol === "BTC"
-            ? this.bitgetBtcPrice
-            : symbol === "ETH"
-            ? this.bitgetEthPrice
-            : symbol === "SOL"
-            ? this.bitgetSolPrice
-            : this.bitgetXrpPrice,
-        DEEPCOIN:
-          symbol === "BTC"
-            ? this.deepcoinBtcPrice
-            : symbol === "ETH"
-            ? this.deepcoinEthPrice
-            : symbol === "SOL"
-            ? this.deepcoinSolPrice
-            : this.deepcoinXrpPrice,
-        ASTER: 0,
-        HYPER: 0,
-      };
-
-      const startPriceMap: Record<Exchange, number> = {
-        BINANCE:
-          symbol === "BTC"
-            ? this.binanceBtcStartPrice
-            : symbol === "ETH"
-            ? this.binanceEthStartPrice
-            : symbol === "SOL"
-            ? this.binanceSolStartPrice
-            : this.binanceXrpStartPrice,
-        BYBIT: this.bybitStartPrices[symbol],
-        GATE: this.gateStartPrices[symbol],
-        OKX: this.okxStartPrices[symbol],
-        MEXC: this.mexcStartPrices[symbol],
-        BITGET: this.bitgetStartPrices[symbol],
-        DEEPCOIN: this.deepcoinStartPrices[symbol],
-        ASTER: 0,
-        HYPER: 0,
-      };
-
-      const currentPrice = currentPriceMap[exch];
-      const startPrice = startPriceMap[exch];
-
-      // If no valid price, fall back to pure Poly
-      if (currentPrice <= 0 || startPrice <= 0) {
-        this.hybridFairs[symbol][exch] = { UP: polyUp, DOWN: polyDown };
-        return;
-      }
-
-      // Spike detection (same as before)
-      const gbmEx = this.gbm[symbol][exch];
-      // Inside the forEach loop
-      const spike = gbmEx.getRecentPctChange(100); // ← Faster detection
-
-      const spikeAbs = Math.abs(spike);
-      const spikeDir = spike >= 0 ? 1 : -1;
-
-      const baseThresh = (this.spikeThresh[symbol] || 0.05) * 0.9;
-      const severity = Math.min(1, spikeAbs / baseThresh);
-
-      // Stronger near expiry + when far from start
-      const moneyness = Math.abs(Math.log(currentPrice / startPrice));
-      const timeFactor = Math.min(1, minsLeft / 15);
-
-      let dynamicBlend =
-        0.03 + 0.12 * (1 - Math.exp(-moneyness * 4)) * timeFactor;
-      dynamicBlend = Math.max(0.03, Math.min(0.2, dynamicBlend)); // up to ±20% pull on strong late spike
-
-      const adjustment = severity * spikeDir * dynamicBlend;
-
-      // 1️⃣ Exchange-driven GBM fair (like old version)
-      const gbmFair = gbmEx.calculate(currentPrice, startPrice, minsLeft).UP;
-
-      // 2️⃣ Apply spike as a directional impulse to GBM
-      let hybridUp = gbmFair * (1 + adjustment);
-
-      // 3️⃣ Gentle pull toward Poly only when no strong impulse
-      const impulseStrength = Math.min(1, Math.abs(adjustment) / 0.05); // tune later
-      hybridUp = impulseStrength * hybridUp + (1 - impulseStrength) * polyUp;
-
-      // 4️⃣ Clamp
-      hybridUp = Math.max(0.001, Math.min(0.999, hybridUp));
-
-      this.hybridFairs[symbol][exch] = { UP: hybridUp, DOWN: 1 - hybridUp };
-    });
-
-    // Consensus update
-    const consensusUp = this.getConsensusHybridUp(symbol, false); // false = exclude Binance
-    this.fairProbs[symbol].UP = Math.max(0.001, Math.min(0.999, consensusUp));
-    this.fairProbs[symbol].DOWN = 1 - this.fairProbs[symbol].UP;
-  }
   private fmtPct(p: number): string {
     return (p * 100).toFixed(1).padEnd(5);
   }
@@ -2636,26 +2339,8 @@ class AutoTradingBot {
   private recordPlotPoint(symbol: AssetSymbol) {
     const now = Date.now();
 
+    const fair = this.fairProbs[symbol];
     const book = this.book[symbol];
-    const hybridByEx = this.hybridFairs[symbol];
-
-    // Calculate consensus directly from hybridFairs
-    let consensusUp = 0;
-    const activeHybrids = Object.values(hybridByEx).filter(
-      (h) => h.UP > 0.001 && h.UP < 0.999
-    ); // optional: filter stale
-    if (activeHybrids.length > 0) {
-      consensusUp =
-        (activeHybrids.reduce((sum, h) => sum + h.UP, 0) /
-          activeHybrids.length) *
-        100;
-    } else {
-      consensusUp = book.UP.mid * 100; // fallback to Poly
-    }
-
-    // Use consensus for "fair" in dashboard/plots (replace old fair.UP)
-    const fairUp = consensusUp / 100; // for edge calc
-    const fairDown = 100 - consensusUp;
 
     // ───────────────── Binance prices & start ─────────────────
     const binancePrice =
@@ -2822,54 +2507,27 @@ class AutoTradingBot {
 
       fairCombined: combinedFairUp * 100,
 
-      // Per-exchange Poly-spike hybrids
-      hybridBinance: (hybridByEx.BINANCE?.UP ?? book.UP.mid) * 100,
-      hybridBybit: (hybridByEx.BYBIT?.UP ?? book.UP.mid) * 100,
-      hybridGate: (hybridByEx.GATE?.UP ?? book.UP.mid) * 100,
-      hybridOkx: (hybridByEx.OKX?.UP ?? book.UP.mid) * 100,
-      hybridMexc: (hybridByEx.MEXC?.UP ?? book.UP.mid) * 100,
-      hybridBitget: (hybridByEx.BITGET?.UP ?? book.UP.mid) * 100,
-      hybridDeepcoin: (hybridByEx.DEEPCOIN?.UP ?? book.UP.mid) * 100,
+      // Per-exchange GBM fair curves
+      fairBinance: (fairByEx.BINANCE ?? fair.UP) * 100,
+      fairBybit: (fairByEx.BYBIT ?? fair.UP) * 100,
+      fairGate: (fairByEx.GATE ?? fair.UP) * 100,
+      fairOkx: (fairByEx.OKX ?? fair.UP) * 100,
+      fairAster: (fairByEx.ASTER ?? fair.UP) * 100,
+      fairHyper: (fairByEx.HYPER ?? fair.UP) * 100,
 
-      // Consensus hybrid (the one used in dashboard & trading)
-      hybridConsensus: consensusUp,
+      // 🆕 NEW fairs
+      fairMexc: (fairByEx.MEXC ?? fair.UP) * 100,
+      fairBitget: (fairByEx.BITGET ?? fair.UP) * 100,
+      fairDeepcoin: (fairByEx.DEEPCOIN ?? fair.UP) * 100,
 
       // Poly
       polyUp: book.UP.mid * 100,
       polyDown: book.DOWN.mid * 100,
 
       // Edge vs hybrid fair
-      edgeUp: (fairUp - book.UP.mid) * 100,
-      edgeDown: (1 - fairUp - book.DOWN.mid) * 100,
+      edgeUp: (fair.UP - book.UP.mid) * 100,
+      edgeDown: (fair.DOWN - book.DOWN.mid) * 100,
     });
-  }
-
-  private getConsensusHybridUp(
-    symbol: AssetSymbol,
-    includeBinance = false
-  ): number {
-    const hybridMap = this.hybridFairs[symbol];
-
-    const activeHybrids = Object.entries(hybridMap)
-      .filter(([exch, fair]) => {
-        // Skip Binance if requested
-        if (!includeBinance && exch === "BINANCE") return false;
-
-        // Skip inactive exchanges (no real price data)
-        if (exch === "ASTER" || exch === "HYPER") return false;
-
-        // Optional: skip if hybrid is exactly neutral (never updated)
-        if (fair.UP === 0.5 && fair.DOWN === 0.5) return false;
-
-        return true;
-      })
-      .map(([, fair]) => fair.UP);
-
-    if (activeHybrids.length === 0) return this.book[symbol].UP.mid || 0.5;
-
-    return (
-      activeHybrids.reduce((sum, up) => sum + up, 0) / activeHybrids.length
-    );
   }
 
   private render() {
