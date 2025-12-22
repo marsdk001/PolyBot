@@ -6,7 +6,7 @@
         "request": "launch",
         "name": "Run auto-trade",
         "skipFiles": ["<node_internals>/**"],
-        "program": "${workspaceFolder}/src/auto_trading_bot.ts",
+        "program": "${workspaceFolder}/src/index.ts",
         "runtimeArgs": ["-r", "ts-node/register"],
         "console": "integratedTerminal",
         "internalConsoleOptions": "neverOpen"
