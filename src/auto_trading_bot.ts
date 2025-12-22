@@ -10,7 +10,7 @@ import fs from "fs";
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const PLOT_INTERVAL_SEC = 60; // 5 minutes (CHANGE TO 3600 LATER)
-const SAMPLE_INTERVAL_MS = 100;
+const SAMPLE_INTERVAL_MS = 50;
 const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
 const PLOTS_DIR = "./plots";
 
@@ -52,6 +52,8 @@ type PlotPoint = {
   // 🔹 Hybrid fair (current production logic)
   fairUp?: number;
   fairDown?: number;
+
+  fairCombined?: number;
 
   // 🔹 Per-exchange GBM fairs (UP probability %)
   fairBinance?: number;
@@ -139,6 +141,7 @@ class PlotBuffer {
         name: "Fair UP (Hybrid)",
         yaxis: "y1",
         line: { dash: "solid", width: 3 },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -183,6 +186,16 @@ class PlotBuffer {
       },
 
       // ───────────── Per-exchange fair curves (legend-only) ─────────────
+      {
+        x: t,
+        y: this.data.map((d) => d.fairCombined),
+        name: "Combined Exchange Fair",
+        yaxis: "y1",
+        line: {
+          width: 1,
+          dash: "solid",
+        },
+      },      
       {
         x: t,
         y: this.data.map((d) => d.fairBinance),
@@ -240,6 +253,7 @@ class PlotBuffer {
         name: "% Δ Binance",
         yaxis: "y2",
         line: { width: 3, color: "#00ff00" },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -247,6 +261,7 @@ class PlotBuffer {
         name: "% Δ Bybit",
         yaxis: "y2",
         line: { width: 2, color: "#ff9900" },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -254,6 +269,7 @@ class PlotBuffer {
         name: "% Δ Gate.io",
         yaxis: "y2",
         line: { width: 2, color: "#ff00ff" },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -261,6 +277,7 @@ class PlotBuffer {
         name: "% Δ OKX",
         yaxis: "y2",
         line: { width: 2, color: "#00ffff" },
+        visible: "legendonly",
       },
 
       // 🆕 NEW venues
@@ -270,6 +287,7 @@ class PlotBuffer {
         name: "% Δ MEXC",
         yaxis: "y2",
         line: { width: 2, color: "#081b06" },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -277,6 +295,7 @@ class PlotBuffer {
         name: "% Δ Bitget",
         yaxis: "y2",
         line: { width: 2, color: "#00aa88" },
+        visible: "legendonly",
       },
       {
         x: t,
@@ -284,6 +303,7 @@ class PlotBuffer {
         name: "% Δ Deepcoin",
         yaxis: "y2",
         line: { width: 2, color: "#8888ff" },
+        visible: "legendonly",
       },
     ];
 
@@ -2215,7 +2235,17 @@ class AutoTradingBot {
       minsLeft
     ).UP;
 
-    this.fairByExchange[symbol][exchange] = fairUp;
+    const polyUp = this.book[symbol].UP.mid;
+
+    // How tightly GBM should hug Poly
+    const tether = 0.15; // 0 = pure GBM, 1 = pure Poly
+
+    const straddledUp = fairUp * (1 - tether) + polyUp * tether;
+
+    this.fairByExchange[symbol][exchange] = Math.max(
+      0.001,
+      Math.min(0.999, straddledUp)
+    );
   }
   private updateHybridFair(symbol: AssetSymbol, now: number) {
     // ───────────────── GBM: BINANCE only (by design) ─────────────────
@@ -2281,6 +2311,31 @@ class AutoTradingBot {
     return (p * 100).toFixed(1).padEnd(5);
   }
 
+  private getCombinedExchangeFair(symbol: AssetSymbol): number {
+    const fairByEx = this.fairByExchange[symbol];
+  
+    const values = Object.entries(fairByEx)
+      .filter(([exch, v]) => {
+        return (
+          exch !== "BINANCE" &&          // ❌ exclude Binance
+          typeof v === "number" &&
+          v > 0 &&
+          v < 1
+        );
+      })
+      .map(([, v]) => v);
+  
+    if (values.length === 0) {
+      // fall back to Poly ONLY if nothing valid
+      return this.book[symbol].UP.mid;
+    }
+  
+    const combined =
+      values.reduce((sum, v) => sum + v, 0) / values.length;
+  
+    return Math.max(0.001, Math.min(0.999, combined));
+  }
+  
   private recordPlotPoint(symbol: AssetSymbol) {
     const now = Date.now();
 
@@ -2425,6 +2480,8 @@ class AutoTradingBot {
         ? ((deepcoinPrice - deepcoinStart) / deepcoinStart) * 100
         : 0;
 
+    const combinedFairUp = this.getCombinedExchangeFair(symbol);
+
     // ───────────────── Fair-by-exchange (UP probs) ─────────────────
     const fairByEx = this.fairByExchange[symbol];
 
@@ -2447,6 +2504,8 @@ class AutoTradingBot {
       // Existing hybrid fair
       fairUp: fair.UP * 100,
       fairDown: fair.DOWN * 100,
+
+      fairCombined: combinedFairUp * 100,
 
       // Per-exchange GBM fair curves
       fairBinance: (fairByEx.BINANCE ?? fair.UP) * 100,
