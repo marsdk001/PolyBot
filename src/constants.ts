@@ -5,7 +5,7 @@ import * as fs from "fs";
 export const PLOT_INTERVAL_SEC = 60; // 5 minutes (CHANGE TO 3600 LATER)
 export const SAMPLE_INTERVAL_MS = 50;
 export const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
-export const PLOTS_DIR = "./plots";
+export const PLOTS_DIR = path.resolve(process.cwd(), "plots");
 
 if (!fs.existsSync(PLOTS_DIR)) {
   fs.mkdirSync(PLOTS_DIR, { recursive: true });
