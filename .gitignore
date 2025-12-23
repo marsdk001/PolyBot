@@ -1,3 +1,4 @@
 .env
 plots/
 node_modules/
+dist/

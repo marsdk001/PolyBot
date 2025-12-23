@@ -5,6 +5,7 @@ import { PolymarketClient } from "./polymarketClient";
 import { MarketFinder } from "./marketFinder";
 import { VolatilityPreloader } from "./volatilityPreloader";
 import { BinancePerpSource } from "./priceSources/binancePerp";
+import { BitfinexPerpSource } from "./priceSources/bitfinexPerp";
 import { BybitPerpSource } from "./priceSources/bybitPerp";
 import { GatePerpSource } from "./priceSources/gatePerp";
 import { OkxPerpSource } from "./priceSources/okxPerp";
@@ -15,7 +16,13 @@ import { PolymarketWs } from "./polymarketWs";
 import { FairCalculator } from "./fairCalculator";
 import { TradingLogic } from "./tradingLogic";
 import { Dashboard } from "./dashboard";
-import { SAMPLE_INTERVAL_MS } from "./constants";
+import {
+  SAMPLE_INTERVAL_MS,
+  DELTA_ANCHOR_EXCHANGE,
+  LOGIC_INTERVAL_MS,
+  DASHBOARD_INTERVAL_MS,
+  TRADING_LOOP_MS,
+} from "./constants";
 import { AssetSymbol, Exchange, PlotPoint, FairProbs } from "./types";
 import readline from "readline";
 
@@ -33,6 +40,7 @@ export class AutoTradingBot {
 
   // Price sources
   private binanceSource: BinancePerpSource;
+  private bitfinexSource: BitfinexPerpSource;
   private bybitSource: BybitPerpSource;
   private gateSource: GatePerpSource;
   private okxSource: OkxPerpSource;
@@ -54,6 +62,16 @@ export class AutoTradingBot {
     XRP: 0,
   };
   private startTimes: Record<AssetSymbol, number> = {
+    BTC: 0,
+    ETH: 0,
+    SOL: 0,
+    XRP: 0,
+  };
+
+  private lastPlotTime = 0;
+  private lastFairUpdate = 0;
+
+  public binanceStartPrices: Record<AssetSymbol, number> = {
     BTC: 0,
     ETH: 0,
     SOL: 0,
@@ -106,6 +124,7 @@ export class AutoTradingBot {
     const onPriceUpdate = () => this.onUpdate();
 
     this.binanceSource = new BinancePerpSource(this.gbm, onPriceUpdate);
+    this.bitfinexSource = new BitfinexPerpSource(this.gbm, onPriceUpdate);
     this.bybitSource = new BybitPerpSource(this.gbm, onPriceUpdate);
     this.gateSource = new GatePerpSource(this.gbm, onPriceUpdate);
     this.okxSource = new OkxPerpSource(this.gbm, onPriceUpdate);
@@ -117,6 +136,7 @@ export class AutoTradingBot {
   private initExchangeGBMs() {
     const exchanges: Exchange[] = [
       "BINANCE",
+      "BITFINEX",
       "BYBIT",
       "GATE",
       "OKX",
@@ -162,13 +182,22 @@ export class AutoTradingBot {
   }
 
   private getCurrentPrice(symbol: AssetSymbol, exchange: Exchange): number {
-    // Handle Binance specifically (the most important one for hybrid fair)
     if (exchange === "BINANCE") {
-      const priceMap: Record<AssetSymbol, number> = {
+      const map: Record<AssetSymbol, number> = {
         BTC: this.binanceSource.binanceBtcPrice,
         ETH: this.binanceSource.binanceEthPrice,
         SOL: this.binanceSource.binanceSolPrice,
         XRP: this.binanceSource.binanceXrpPrice,
+      };
+      return map[symbol] ?? 0;
+    }
+    // Handle Bitfinex specifically (the most important one for hybrid fair)
+    if (exchange === "BITFINEX") {
+      const priceMap: Record<AssetSymbol, number> = {
+        BTC: this.bitfinexSource.bitfinexBtcPrice,
+        ETH: this.bitfinexSource.bitfinexEthPrice,
+        SOL: this.bitfinexSource.bitfinexSolPrice,
+        XRP: this.bitfinexSource.bitfinexXrpPrice,
       };
 
       const price = priceMap[symbol];
@@ -246,8 +275,10 @@ export class AutoTradingBot {
   }
 
   private getStartPrice(symbol: AssetSymbol, exchange: Exchange): number {
-    if (exchange === "BINANCE") return this.marketFinder.getStartPrice(symbol);
+    if (exchange === "BITFINEX") return this.marketFinder.getStartPrice(symbol);
     switch (exchange) {
+      case "BINANCE":
+        return this.binanceSource.binanceStartPrices[symbol];
       case "BYBIT":
         return this.bybitSource.bybitStartPrices[symbol];
       case "GATE":
@@ -309,6 +340,7 @@ export class AutoTradingBot {
 
     // 4. Connect all sources
     this.binanceSource.connect(this.startTimes);
+    this.bitfinexSource.connect(this.startTimes);
     this.bybitSource.connect();
     this.gateSource.connect();
     this.okxSource.connect();
@@ -321,6 +353,7 @@ export class AutoTradingBot {
     this.startLoops();
     this.setupTradingToggle();
   }
+
   private onUpdate() {
     const now = Date.now();
 
@@ -328,15 +361,28 @@ export class AutoTradingBot {
     const symbols: AssetSymbol[] = ["BTC", "ETH", "SOL", "XRP"];
 
     symbols.forEach((symbol) => {
-      // Binance (primary for dashboard)
-      const binancePrice = this.getCurrentPrice(symbol, "BINANCE");
+      // Anchor Exchange (primary for dashboard & delta calculation)
+      const anchorPrice = this.getCurrentPrice(
+        symbol,
+        DELTA_ANCHOR_EXCHANGE as Exchange
+      );
+
       this.prices[symbol] =
-        binancePrice > 0 ? binancePrice : this.startPrices[symbol];
+        anchorPrice > 0 ? anchorPrice : this.startPrices[symbol];
     });
 
-    if (this.startTimes.BTC > 0) {
-      this.fairCalculator.updateAllFairs(now);
+    // Throttle fair calculation to max once per 50ms
+    if (now - this.lastFairUpdate >= 50) {
+      if (this.startTimes.BTC > 0) {
+        this.fairCalculator.updateAllFairs(now);
+      }
+      this.lastFairUpdate = now;
     }
+  }
+
+  private renderDashboard() {
+    const now = Date.now();
+    if (this.startTimes.BTC === 0) return; // Don't render before initialization
 
     // Compute combined fair for dashboard
     const combinedFair: Record<AssetSymbol, FairProbs> = {
@@ -385,8 +431,11 @@ export class AutoTradingBot {
   }
 
   private startLoops() {
-    // Fast render
-    setInterval(() => this.onUpdate(), 500);
+    // 1. Heartbeat for logic (fallback if WS is quiet)
+    setInterval(() => this.onUpdate(), LOGIC_INTERVAL_MS);
+
+    // 2. Dashboard Render Loop (Throttled to 1s to prevent console I/O blocking)
+    setInterval(() => this.renderDashboard(), DASHBOARD_INTERVAL_MS);
 
     // Trading check + rollover
     setInterval(async () => {
@@ -397,7 +446,7 @@ export class AutoTradingBot {
       ["BTC", "ETH", "SOL", "XRP"].forEach((sym) => {
         this.tradingLogic.checkForTrade(sym as AssetSymbol, now);
       });
-    }, 1000);
+    }, TRADING_LOOP_MS);
 
     // Plot sampling
     setInterval(() => {
@@ -485,14 +534,27 @@ export class AutoTradingBot {
   }
 
   private recordAllPlotPoints(now: number) {
+    const lag = this.lastPlotTime > 0 ? Math.max(0, now - this.lastPlotTime - SAMPLE_INTERVAL_MS) : 0;
+    this.lastPlotTime = now;
+
     (["BTC", "ETH", "SOL", "XRP"] as AssetSymbol[]).forEach((symbol) => {
-      // Binance (reference)
-      const binancePrice = this.prices[symbol];
-      const binanceStart = this.startPrices[symbol];
-      const binanceDelta =
-        binanceStart > 0
-          ? ((binancePrice - binanceStart) / binanceStart) * 100
-          : 0;
+      // Anchor (reference)
+      const anchorPrice = this.prices[symbol];
+      const anchorStart = this.startPrices[symbol];
+      const anchorDelta =
+        anchorStart > 0 ? ((anchorPrice - anchorStart) / anchorStart) * 100 : 0;
+
+      // Bitfinex
+      const finSuffix = symbol.charAt(0) + symbol.slice(1).toLowerCase(); // BTC -> Btc
+      const bitfinexPrice = this.bitfinexSource[
+        `bitfinex${finSuffix}Price` as keyof BitfinexPerpSource
+      ] as number;
+
+      const bitfinexStart = this.bitfinexSource.bitfinexStartPrices[symbol];
+      const bitfinexDelta =
+        bitfinexStart > 0
+          ? ((bitfinexPrice - bitfinexStart) / bitfinexStart) * 100
+          : undefined;
 
       // Bybit
       const bybitPrice = this.bybitSource[
@@ -550,9 +612,11 @@ export class AutoTradingBot {
 
       this.plotBuffers[symbol].add({
         ts: now,
+        loopLag: lag,
 
-        // Price % deltas
-        pctDelta: binanceDelta,
+        // Price % deltas (pctDelta is now the Anchor delta)
+        pctDelta: anchorDelta,
+        deltaBitfinex: bitfinexDelta,
         deltaBybit: bybitDelta,
         deltaGate: gateDelta,
         deltaOkx: okxDelta,
@@ -567,6 +631,8 @@ export class AutoTradingBot {
 
         // Per-exchange fair (UP %)
         fairBinance: this.fairCalculator.fairByExchange[symbol]?.BINANCE * 100,
+        fairBitfinex:
+          this.fairCalculator.fairByExchange[symbol]?.BITFINEX * 100,
         fairBybit: this.fairCalculator.fairByExchange[symbol]?.BYBIT * 100,
         fairGate: this.fairCalculator.fairByExchange[symbol]?.GATE * 100,
         fairOkx: this.fairCalculator.fairByExchange[symbol]?.OKX * 100,

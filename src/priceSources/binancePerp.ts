@@ -13,17 +13,28 @@ export class BinancePerpSource {
   public binanceSolPrice = 0;
   public binanceXrpPrice = 0;
 
-  // Start prices (fallback if API fetch fails)
+  // Start prices
   public binanceBtcStartPrice = 0;
   public binanceEthStartPrice = 0;
   public binanceSolStartPrice = 0;
   public binanceXrpStartPrice = 0;
+  
+  public binanceStartPrices: Record<AssetSymbol, number> = {
+    BTC: 0,
+    ETH: 0,
+    SOL: 0,
+    XRP: 0,
+  };
 
-  // Start times (set by MarketFinder)
+  // Start times
   public binanceStartTimeBTC = 0;
   public binanceStartTimeETH = 0;
   public binanceStartTimeSOL = 0;
   public binanceStartTimeXRP = 0;
+
+  // Health tracking
+  private lastMessageTs = 0;
+  private healthInterval: NodeJS.Timeout | null = null;
 
   constructor(
     private gbm: Record<AssetSymbol, Record<Exchange, GBMFairProbability>>,
@@ -48,25 +59,27 @@ export class BinancePerpSource {
 
     const connect = () => {
       if (!this.running) return;
+
       this.ws?.terminate();
       this.ws = new WebSocket(WS_URL);
+      this.lastMessageTs = Date.now();
 
       this.ws.on("open", () => {
         reconnectAttempts = 0;
-        console.log(
-          "✅ Binance Perpetual Futures TRADE WS connected — sub-second updates"
-        );
+        console.log("✅ Binance Perp WS connected");
       });
 
       this.ws.on("message", (data) => {
+        this.lastMessageTs = Date.now();
+
         try {
           const msg = JSON.parse(data.toString());
           const trade = msg.data;
-          if (trade.e !== "trade") return;
+          if (!trade || trade.e !== "trade") return;
 
           const symbol = trade.s;
           const price = parseFloat(trade.p);
-          if (isNaN(price) || price <= 0) return;
+          if (!price || price <= 0) return;
 
           switch (symbol) {
             case "BTCUSDT":
@@ -74,46 +87,64 @@ export class BinancePerpSource {
               this.gbm.BTC.BINANCE.addPrice(price);
               if (this.binanceBtcStartPrice === 0 && this.binanceStartTimeBTC > 0) {
                 this.binanceBtcStartPrice = price;
-                this.gbm.BTC.BINANCE.addPrice(price);
-                console.log(`🎯 BTC perp start price set: $${price.toFixed(2)}`);
+                this.binanceStartPrices.BTC = price;
               }
               break;
+
             case "ETHUSDT":
               this.binanceEthPrice = price;
               this.gbm.ETH.BINANCE.addPrice(price);
               if (this.binanceEthStartPrice === 0 && this.binanceStartTimeETH > 0) {
                 this.binanceEthStartPrice = price;
-                console.log(`🎯 ETH perp start price set: $${price.toFixed(2)}`);
+                this.binanceStartPrices.ETH = price;
               }
               break;
+
             case "SOLUSDT":
               this.binanceSolPrice = price;
               this.gbm.SOL.BINANCE.addPrice(price);
               if (this.binanceSolStartPrice === 0 && this.binanceStartTimeSOL > 0) {
                 this.binanceSolStartPrice = price;
-                console.log(`🎯 SOL perp start price set: $${price.toFixed(4)}`);
+                this.binanceStartPrices.SOL = price;
               }
               break;
+
             case "XRPUSDT":
               this.binanceXrpPrice = price;
               this.gbm.XRP.BINANCE.addPrice(price);
               if (this.binanceXrpStartPrice === 0 && this.binanceStartTimeXRP > 0) {
                 this.binanceXrpStartPrice = price;
-                console.log(`🎯 XRP perp start price set: $${price.toFixed(4)}`);
+                this.binanceStartPrices.XRP = price;
               }
               break;
           }
 
           this.onPriceUpdate();
-        } catch {}
+        } catch (err) {
+          // swallow malformed ticks
+        }
       });
 
       this.ws.on("close", () => {
-        console.log("🔌 Binance Perp WS closed → reconnecting...");
+        console.log("🔌 Binance WS closed → reconnecting...");
         setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 10000));
       });
 
-      this.ws.on("error", () => this.ws?.close());
+      this.ws.on("error", () => {
+        this.ws?.close();
+      });
+
+      // 🔍 Health watchdog (critical)
+      if (this.healthInterval) clearInterval(this.healthInterval);
+      this.healthInterval = setInterval(() => {
+        const age = Date.now() - this.lastMessageTs;
+        if (age > 5000) {
+          console.warn(
+            `⚠️ Binance WS stale (${age}ms no trades) → forcing reconnect`
+          );
+          this.ws?.terminate();
+        }
+      }, 2000);
     };
 
     connect();
@@ -121,6 +152,7 @@ export class BinancePerpSource {
 
   stop() {
     this.running = false;
+    this.healthInterval && clearInterval(this.healthInterval);
     this.ws?.close();
   }
 }

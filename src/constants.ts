@@ -4,8 +4,14 @@ import * as fs from "fs";
 
 export const PLOT_INTERVAL_SEC = 60; // 5 minutes (CHANGE TO 3600 LATER)
 export const SAMPLE_INTERVAL_MS = 50;
+export const LOGIC_INTERVAL_MS = 50;   // Fast heartbeat for logic/prices
+export const DASHBOARD_INTERVAL_MS = 1000; // 1 FPS for UI (prevents lag)
+export const TRADING_LOOP_MS = 100;    // Check for trades every 100ms
 export const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
 export const PLOTS_DIR = path.resolve(process.cwd(), "plots");
+
+// === Anchor Exchange for Deltas ===
+export const DELTA_ANCHOR_EXCHANGE = "BITFINEX"; // Change this to your preferred anchor
 
 if (!fs.existsSync(PLOTS_DIR)) {
   fs.mkdirSync(PLOTS_DIR, { recursive: true });

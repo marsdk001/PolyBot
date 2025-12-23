@@ -17,9 +17,11 @@ export class GBMFairProbability {
     const now = Date.now();
     this.history.push({ ts: now, price });
 
-    // Keep max 48 hours of data
-    const cutoff = now - 48 * 60 * 60 * 1000;
-    this.history = this.history.filter((p) => p.ts > cutoff);
+    // Keep max 60 seconds of data (we only need ~2s for recent change)
+    const cutoff = now - 60 * 1000;
+    while (this.history.length > 0 && this.history[0].ts < cutoff) {
+      this.history.shift();
+    }
 
     if (this.history.length > 1) {
       const prevPrice = this.history[this.history.length - 2].price;
@@ -50,10 +52,16 @@ export class GBMFairProbability {
     if (this.history.length < 2) return 0;
     const now = this.history[this.history.length - 1].ts;
     const target = now - ms;
-    const past = [...this.history].reverse().find((p) => p.ts <= target);
-    if (!past) return 0;
-    const curr = this.history[this.history.length - 1].price;
-    return ((curr - past.price) / past.price) * 100;
+
+    // Iterate backwards without copying array
+    for (let i = this.history.length - 1; i >= 0; i--) {
+      if (this.history[i].ts <= target) {
+        const past = this.history[i];
+        const curr = this.history[this.history.length - 1].price;
+        return ((curr - past.price) / past.price) * 100;
+      }
+    }
+    return 0;
   }
 
   private normCDF(x: number): number {
@@ -138,18 +146,12 @@ export class GBMFairProbability {
     let fairUp = this.normCDF(d);
     fairUp = Math.max(0.001, Math.min(0.999, fairUp));
 
-    // --- Relaxation (critical for smoothing) ---
-    const relax = 0.08 + 0.25 * Math.exp(-moneyness * 5) * timeFactor;
-
-    if (this.lastFairUp == null) {
-      this.lastFairUp = fairUp;
-    } else {
-      this.lastFairUp = this.lastFairUp * (1 - relax) + fairUp * relax;
-    }
+    // No smoothing (snappy response)
+    this.lastFairUp = fairUp;
 
     return {
-      UP: this.lastFairUp,
-      DOWN: 1 - this.lastFairUp,
+      UP: fairUp,
+      DOWN: 1 - fairUp,
     };
   }
 }

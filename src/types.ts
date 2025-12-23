@@ -2,6 +2,7 @@
 
 export type Exchange =
   | "BINANCE"
+  | "BITFINEX"
   | "BYBIT"
   | "GATE"
   | "OKX"
@@ -14,7 +15,11 @@ export type Exchange =
 // Forward declaration: we don't need the full class, just the shape for mapping
 export type GBMFairProbabilityInstance = {
   addPrice(price: number): void;
-  calculate(currentPrice: number, startPrice: number, minutesRemaining: number): { UP: number; DOWN: number };
+  calculate(
+    currentPrice: number,
+    startPrice: number,
+    minutesRemaining: number
+  ): { UP: number; DOWN: number };
   getRecentPctChange(ms: number): number;
   estimateVolatilityPerMinute(): number;
   preloadHistoricalPrices?(prices: number[]): void;
@@ -27,11 +32,13 @@ export type FairByExchange = Record<Exchange, number>;
 
 export type PlotPoint = {
   ts: number;
+  loopLag?: number;
 
   // Base delta (Binance reference)
   pctDelta: number;
 
   // Per-exchange deltas
+  deltaBitfinex?: number;
   deltaBybit?: number;
   deltaGate?: number;
   deltaOkx?: number;
@@ -49,6 +56,7 @@ export type PlotPoint = {
 
   // 🔹 Per-exchange GBM fairs (UP probability %)
   fairBinance?: number;
+  fairBitfinex?: number;
   fairBybit?: number;
   fairGate?: number;
   fairOkx?: number;

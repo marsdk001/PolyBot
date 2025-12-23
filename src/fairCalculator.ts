@@ -84,10 +84,10 @@ export class FairCalculator {
   }
 
   private updateHybridFair(symbol: AssetSymbol, now: number) {
-    const gbm = this.gbm[symbol].BINANCE;
+    const gbm = this.gbm[symbol].BITFINEX;
 
-    const currentPrice = this.getCurrentPrice(symbol, "BINANCE");
-    const startPrice = this.getStartPrice(symbol, "BINANCE");
+    const currentPrice = this.getCurrentPrice(symbol, "BITFINEX");
+    const startPrice = this.getStartPrice(symbol, "BITFINEX");
     const marketStartTime = this.getMarketStartTime(symbol);
 
     if (currentPrice <= 0 || startPrice <= 0 || marketStartTime <= 0) return;
@@ -125,7 +125,7 @@ export class FairCalculator {
 
   getCombinedExchangeFair(symbol: AssetSymbol): number {
     const values = Object.entries(this.fairByExchange[symbol])
-      .filter(([exch]) => exch !== "BINANCE" && exch !== "DEEPCOIN")  // ← Exclude Deepcoin too
+      .filter(([exch]) => exch !== "BINANCE" && exch !== "DEEPCOIN" && exch !== "BITFINEX")
       .map(([, v]) => v)
       .filter((v) => v > 0 && v < 1);
 
