@@ -11,7 +11,17 @@ export const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
 export const PLOTS_DIR = path.resolve(process.cwd(), "plots");
 
 // === Anchor Exchange for Deltas ===
-export const DELTA_ANCHOR_EXCHANGE = "BITFINEX"; // Change this to your preferred anchor
+export const DELTA_ANCHOR_EXCHANGE = "BINANCE"; // Change this to your preferred anchor
+
+// === Plot Visibility Configuration ===
+export const PLOT_VISIBLE_POLY_UP = true;
+export const PLOT_VISIBLE_POLY_DOWN = "legendonly";
+export const PLOT_VISIBLE_EDGE = "legendonly";
+export const PLOT_VISIBLE_FAIR_COMBINED = true;
+export const PLOT_VISIBLE_FAIR_INDIVIDUAL = true;
+export const PLOT_VISIBLE_DELTAS = true;
+export const PLOT_VISIBLE_LAG = "legendonly";
+export const PLOT_VISIBLE_STALENESS = "legendonly";
 
 if (!fs.existsSync(PLOTS_DIR)) {
   fs.mkdirSync(PLOTS_DIR, { recursive: true });

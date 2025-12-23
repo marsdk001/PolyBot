@@ -5,7 +5,6 @@ import { PolymarketClient } from "./polymarketClient";
 import { MarketFinder } from "./marketFinder";
 import { VolatilityPreloader } from "./volatilityPreloader";
 import { BinancePerpSource } from "./priceSources/binancePerp";
-import { BitfinexPerpSource } from "./priceSources/bitfinexPerp";
 import { BybitPerpSource } from "./priceSources/bybitPerp";
 import { GatePerpSource } from "./priceSources/gatePerp";
 import { OkxPerpSource } from "./priceSources/okxPerp";
@@ -40,13 +39,11 @@ export class AutoTradingBot {
 
   // Price sources
   private binanceSource: BinancePerpSource;
-  private bitfinexSource: BitfinexPerpSource;
   private bybitSource: BybitPerpSource;
   private gateSource: GatePerpSource;
   private okxSource: OkxPerpSource;
   private mexcSource: MexcPerpSource;
   private bitgetSource: BitgetPerpSource;
-  private deepcoinSource: DeepcoinPerpSource;
 
   // Shared state for easy access
   private prices: Record<AssetSymbol, number> = {
@@ -124,19 +121,16 @@ export class AutoTradingBot {
     const onPriceUpdate = () => this.onUpdate();
 
     this.binanceSource = new BinancePerpSource(this.gbm, onPriceUpdate);
-    this.bitfinexSource = new BitfinexPerpSource(this.gbm, onPriceUpdate);
     this.bybitSource = new BybitPerpSource(this.gbm, onPriceUpdate);
     this.gateSource = new GatePerpSource(this.gbm, onPriceUpdate);
     this.okxSource = new OkxPerpSource(this.gbm, onPriceUpdate);
     this.mexcSource = new MexcPerpSource(this.gbm, onPriceUpdate);
     this.bitgetSource = new BitgetPerpSource(this.gbm, onPriceUpdate);
-    this.deepcoinSource = new DeepcoinPerpSource(this.gbm, onPriceUpdate);
   }
 
   private initExchangeGBMs() {
     const exchanges: Exchange[] = [
       "BINANCE",
-      "BITFINEX",
       "BYBIT",
       "GATE",
       "OKX",
@@ -191,23 +185,6 @@ export class AutoTradingBot {
       };
       return map[symbol] ?? 0;
     }
-    // Handle Bitfinex specifically (the most important one for hybrid fair)
-    if (exchange === "BITFINEX") {
-      const priceMap: Record<AssetSymbol, number> = {
-        BTC: this.bitfinexSource.bitfinexBtcPrice,
-        ETH: this.bitfinexSource.bitfinexEthPrice,
-        SOL: this.bitfinexSource.bitfinexSolPrice,
-        XRP: this.bitfinexSource.bitfinexXrpPrice,
-      };
-
-      const price = priceMap[symbol];
-
-      // If we have a valid live price, use it; otherwise fall back to start price
-      if (price > 0) {
-        return price;
-      }
-    }
-
     // Existing handling for other exchanges (keep your original code here)
     // Example for the others — adjust if you have more:
     if (exchange === "BYBIT") {
@@ -259,23 +236,11 @@ export class AutoTradingBot {
       };
       return map[symbol] ?? 0;
     }
-
-    if (exchange === "DEEPCOIN") {
-      const map: Record<AssetSymbol, number> = {
-        BTC: this.deepcoinSource.deepcoinBTCPrice,
-        ETH: this.deepcoinSource.deepcoinETHPrice,
-        SOL: this.deepcoinSource.deepcoinSOLPrice,
-        XRP: this.deepcoinSource.deepcoinXRPPrice,
-      };
-      return map[symbol] ?? 0;
-    }
-
     // Final fallback
     return this.startPrices[symbol] || 0;
   }
 
   private getStartPrice(symbol: AssetSymbol, exchange: Exchange): number {
-    if (exchange === "BITFINEX") return this.marketFinder.getStartPrice(symbol);
     switch (exchange) {
       case "BINANCE":
         return this.binanceSource.binanceStartPrices[symbol];
@@ -289,8 +254,6 @@ export class AutoTradingBot {
         return this.mexcSource.mexcStartPrices[symbol];
       case "BITGET":
         return this.bitgetSource.bitgetStartPrices[symbol];
-      case "DEEPCOIN":
-        return this.deepcoinSource.deepcoinStartPrices[symbol];
       default:
         return 0;
     }
@@ -320,7 +283,6 @@ export class AutoTradingBot {
         this.okxSource.okxStartPrices[symbol] = startPrice;
         this.mexcSource.mexcStartPrices[symbol] = startPrice;
         this.bitgetSource.bitgetStartPrices[symbol] = startPrice;
-        this.deepcoinSource.deepcoinStartPrices[symbol] = startPrice;
 
         console.log(
           `🎯 Initial ${symbol} start — time: ${new Date(
@@ -340,7 +302,6 @@ export class AutoTradingBot {
 
     // 4. Connect all sources
     this.binanceSource.connect(this.startTimes);
-    this.bitfinexSource.connect(this.startTimes);
     this.bybitSource.connect();
     this.gateSource.connect();
     this.okxSource.connect();
@@ -499,7 +460,6 @@ export class AutoTradingBot {
         this.okxSource.okxStartPrices[symbol] = newStartPrice;
         this.mexcSource.mexcStartPrices[symbol] = newStartPrice;
         this.bitgetSource.bitgetStartPrices[symbol] = newStartPrice;
-        this.deepcoinSource.deepcoinStartPrices[symbol] = newStartPrice;
 
         console.log(
           `🎯 ${symbol} rollover — new start time: ${new Date(
@@ -536,6 +496,12 @@ export class AutoTradingBot {
   private recordAllPlotPoints(now: number) {
     const lag = this.lastPlotTime > 0 ? Math.max(0, now - this.lastPlotTime - SAMPLE_INTERVAL_MS) : 0;
     this.lastPlotTime = now;
+    const binanceStaleness = now - this.binanceSource.lastMessageTs;
+    const bybitStaleness = now - this.bybitSource.lastMessageTs;
+    const gateStaleness = now - this.gateSource.lastMessageTs;
+    const okxStaleness = now - this.okxSource.lastMessageTs;
+    const mexcStaleness = now - this.mexcSource.lastMessageTs;
+    const bitgetStaleness = now - this.bitgetSource.lastMessageTs;
 
     (["BTC", "ETH", "SOL", "XRP"] as AssetSymbol[]).forEach((symbol) => {
       // Anchor (reference)
@@ -543,18 +509,6 @@ export class AutoTradingBot {
       const anchorStart = this.startPrices[symbol];
       const anchorDelta =
         anchorStart > 0 ? ((anchorPrice - anchorStart) / anchorStart) * 100 : 0;
-
-      // Bitfinex
-      const finSuffix = symbol.charAt(0) + symbol.slice(1).toLowerCase(); // BTC -> Btc
-      const bitfinexPrice = this.bitfinexSource[
-        `bitfinex${finSuffix}Price` as keyof BitfinexPerpSource
-      ] as number;
-
-      const bitfinexStart = this.bitfinexSource.bitfinexStartPrices[symbol];
-      const bitfinexDelta =
-        bitfinexStart > 0
-          ? ((bitfinexPrice - bitfinexStart) / bitfinexStart) * 100
-          : undefined;
 
       // Bybit
       const bybitPrice = this.bybitSource[
@@ -600,29 +554,23 @@ export class AutoTradingBot {
           ? ((bitgetPrice - bitgetStart) / bitgetStart) * 100
           : undefined;
 
-      // Deepcoin
-      const deepcoinPrice = this.deepcoinSource[
-        `deepcoin${symbol}Price` as keyof DeepcoinPerpSource
-      ] as number;
-      const deepcoinStart = this.deepcoinSource.deepcoinStartPrices[symbol];
-      const deepcoinDelta =
-        deepcoinStart > 0
-          ? ((deepcoinPrice - deepcoinStart) / deepcoinStart) * 100
-          : undefined;
-
       this.plotBuffers[symbol].add({
         ts: now,
         loopLag: lag,
+        binanceStaleness: binanceStaleness,
+        bybitStaleness: bybitStaleness,
+        gateStaleness: gateStaleness,
+        okxStaleness: okxStaleness,
+        mexcStaleness: mexcStaleness,
+        bitgetStaleness: bitgetStaleness,
 
         // Price % deltas (pctDelta is now the Anchor delta)
         pctDelta: anchorDelta,
-        deltaBitfinex: bitfinexDelta,
         deltaBybit: bybitDelta,
         deltaGate: gateDelta,
         deltaOkx: okxDelta,
         deltaMexc: mexcDelta,
         deltaBitget: bitgetDelta,
-        deltaDeepcoin: deepcoinDelta,
 
         // Fair probabilities
         fairUp: this.fairCalculator.fairProbs[symbol].UP * 100,
@@ -631,8 +579,6 @@ export class AutoTradingBot {
 
         // Per-exchange fair (UP %)
         fairBinance: this.fairCalculator.fairByExchange[symbol]?.BINANCE * 100,
-        fairBitfinex:
-          this.fairCalculator.fairByExchange[symbol]?.BITFINEX * 100,
         fairBybit: this.fairCalculator.fairByExchange[symbol]?.BYBIT * 100,
         fairGate: this.fairCalculator.fairByExchange[symbol]?.GATE * 100,
         fairOkx: this.fairCalculator.fairByExchange[symbol]?.OKX * 100,

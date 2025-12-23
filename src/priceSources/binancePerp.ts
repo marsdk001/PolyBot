@@ -33,7 +33,7 @@ export class BinancePerpSource {
   public binanceStartTimeXRP = 0;
 
   // Health tracking
-  private lastMessageTs = 0;
+  public lastMessageTs = 0;
   private healthInterval: NodeJS.Timeout | null = null;
 
   constructor(

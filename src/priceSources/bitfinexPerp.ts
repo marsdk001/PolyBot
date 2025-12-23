@@ -36,7 +36,7 @@ export class BitfinexPerpSource {
   public bitfinexStartTimeXRP = 0;
 
   // Health tracking
-  private lastMessageTs = 0;
+  public lastMessageTs = 0;
   private healthInterval: NodeJS.Timeout | null = null;
 
   // Channel → symbol mapping
@@ -90,8 +90,14 @@ export class BitfinexPerpSource {
             return;
           }
 
+          // Pong (response to our ping)
+          if (msg.event === "pong") return;
+
           // Heartbeat
-          if (Array.isArray(msg) && msg[1] === "hb") return;
+          if (Array.isArray(msg) && msg[1] === "hb") {
+            // Heartbeat received (updates lastMessageTs automatically below)
+            return;
+          }
 
           // Trade message
           if (Array.isArray(msg) && Array.isArray(msg[2])) {
@@ -124,9 +130,15 @@ export class BitfinexPerpSource {
       if (this.healthInterval) clearInterval(this.healthInterval);
       this.healthInterval = setInterval(() => {
         const age = Date.now() - this.lastMessageTs;
-        if (age > 5000) {
+
+        // Active Ping: If quiet for 5s, send a ping to provoke a response (Pong)
+        if (age > 5000 && age < 7000 && this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify({ event: "ping", cid: 1234 }));
+        }
+
+        if (age > 30000) {
           console.warn(
-            `⚠️ Bitfinex WS stale (${age}ms no trades) → forcing reconnect`
+            `⚠️ Bitfinex WS stale (${age}ms > 30s limit) → forcing reconnect`
           );
           this.ws?.terminate();
         }
@@ -169,7 +181,6 @@ export class BitfinexPerpSource {
         if (this.bitfinexBtcStartPrice === 0 && this.bitfinexStartTimeBTC > 0) {
           this.bitfinexBtcStartPrice = price;
           this.bitfinexStartPrices.BTC = price;
-          console.log(`🎯 BTC Bitfinex start price set: $${price.toFixed(2)}`);
         }
         break;
 
@@ -179,7 +190,6 @@ export class BitfinexPerpSource {
         if (this.bitfinexEthStartPrice === 0 && this.bitfinexStartTimeETH > 0) {
           this.bitfinexEthStartPrice = price;
           this.bitfinexStartPrices.ETH = price;
-          console.log(`🎯 ETH Bitfinex start price set: $${price.toFixed(2)}`);
         }
         break;
 
@@ -190,7 +200,6 @@ export class BitfinexPerpSource {
           this.bitfinexSolStartPrice = price;
           this.bitfinexStartPrices.SOL = price;
           this.bitfinexStartPrices.XRP = price;
-          console.log(`🎯 SOL Bitfinex start price set: $${price.toFixed(4)}`);
         }
         break;
 
@@ -199,7 +208,6 @@ export class BitfinexPerpSource {
         this.gbm.XRP.BITFINEX.addPrice(price);
         if (this.bitfinexXrpStartPrice === 0 && this.bitfinexStartTimeXRP > 0) {
           this.bitfinexXrpStartPrice = price;
-          console.log(`🎯 XRP Bitfinex start price set: $${price.toFixed(4)}`);
         }
         break;
     }

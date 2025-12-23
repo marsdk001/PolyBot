@@ -33,12 +33,18 @@ export type FairByExchange = Record<Exchange, number>;
 export type PlotPoint = {
   ts: number;
   loopLag?: number;
+  binanceStaleness?: number;
+  bybitStaleness?: number;
+  gateStaleness?: number;
+  okxStaleness?: number;
+  mexcStaleness?: number;
+  bitgetStaleness?: number;
+  deepcoinStaleness?: number;
 
   // Base delta (Binance reference)
   pctDelta: number;
 
   // Per-exchange deltas
-  deltaBitfinex?: number;
   deltaBybit?: number;
   deltaGate?: number;
   deltaOkx?: number;
@@ -56,7 +62,6 @@ export type PlotPoint = {
 
   // 🔹 Per-exchange GBM fairs (UP probability %)
   fairBinance?: number;
-  fairBitfinex?: number;
   fairBybit?: number;
   fairGate?: number;
   fairOkx?: number;

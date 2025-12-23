@@ -2,6 +2,16 @@
 import { parentPort } from "worker_threads";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  PLOT_VISIBLE_POLY_UP,
+  PLOT_VISIBLE_POLY_DOWN,
+  PLOT_VISIBLE_EDGE,
+  PLOT_VISIBLE_FAIR_COMBINED,
+  PLOT_VISIBLE_FAIR_INDIVIDUAL,
+  PLOT_VISIBLE_DELTAS,
+  PLOT_VISIBLE_LAG,
+  PLOT_VISIBLE_STALENESS,
+} from "./constants";
 
 parentPort?.on("message", async (msg) => {
   const { symbol, data, plotsDir, bucketStart } = msg;
@@ -43,6 +53,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { dash: "dot" },
       mode: "lines+markers",
       marker: { size: 3 },
+      visible: PLOT_VISIBLE_POLY_UP,
     },
     {
       x: t,
@@ -52,7 +63,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { dash: "dot" },
       mode: "lines+markers",
       marker: { size: 3 },
-      visible: "legendonly",
+      visible: PLOT_VISIBLE_POLY_DOWN,
     },
 
     // Edge
@@ -64,7 +75,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { dash: "dash" },
       mode: "lines+markers",
       marker: { size: 3 },
-      visible: "legendonly",
+      visible: PLOT_VISIBLE_EDGE,
     },
     {
       x: t,
@@ -74,7 +85,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { dash: "dash" },
       mode: "lines+markers",
       marker: { size: 3 },
-      visible: "legendonly",
+      visible: PLOT_VISIBLE_EDGE,
     },
 
     // Combined Exchange Fair
@@ -86,6 +97,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 3, color: "#9467bd" },
       mode: "lines+markers",
       marker: { size: 3 },
+      visible: PLOT_VISIBLE_FAIR_COMBINED,
     },
 
     // Per-exchange GBM fairs
@@ -97,6 +109,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#1f77b4" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
     {
       x: t,
@@ -106,6 +119,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#ff7f0e" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
     {
       x: t,
@@ -115,6 +129,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#2ca02c" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
     {
       x: t,
@@ -124,6 +139,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#d62728" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
     {
       x: t,
@@ -133,6 +149,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#9467bd" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
     {
       x: t,
@@ -142,6 +159,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { color: "#8c564b" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
 
     // Price % deltas
@@ -153,15 +171,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 3, color: "#00ff00" },
       mode: "lines+markers",
       marker: { size: 3 },
-    },
-    {
-      x: t,
-      y: data.map((d: any) => d.deltaBitfinex),
-      name: "% Δ Bitfinex",
-      yaxis: "y2",
-      line: { width: 2, color: "#aaaaaa" },
-      mode: "lines+markers",
-      marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
     {
       x: t,
@@ -171,6 +181,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 2, color: "#ff9900" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
     {
       x: t,
@@ -180,6 +191,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 2, color: "#ff00ff" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
     {
       x: t,
@@ -189,6 +201,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 2, color: "#00ffff" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
     {
       x: t,
@@ -198,6 +211,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 2, color: "#081b06" },
       mode: "lines+markers",
       marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
     {
       x: t,
@@ -207,15 +221,7 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 2, color: "#00aa88" },
       mode: "lines+markers",
       marker: { size: 2 },
-    },
-    {
-      x: t,
-      y: data.map((d: any) => d.deltaDeepcoin),
-      name: "% Δ Deepcoin",
-      yaxis: "y2",
-      line: { width: 2, color: "#8888ff" },
-      mode: "lines+markers",
-      marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
     },
 
     // Loop Lag
@@ -227,9 +233,65 @@ function generateHTML(symbol: string, data: any[]): string {
       line: { width: 1, color: "#ff0000" },
       mode: "lines+markers",
       marker: { size: 2 },
-      visible: "legendonly",
+      visible: PLOT_VISIBLE_LAG,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.binanceStaleness),
+      name: "Binance Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#00aaff" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.bybitStaleness),
+      name: "Bybit Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#ffaa00" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.gateStaleness),
+      name: "Gate Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#aaff00" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.okxStaleness),
+      name: "OKX Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#00ffaa" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.mexcStaleness),
+      name: "MEXC Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#aa00ff" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.bitgetStaleness),
+      name: "Bitget Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#00aaaa" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
     },
   ];
+
+
 
   const layout = {
     title: `${symbol} – 1 Minute Multi-Exchange Snapshot`,
@@ -254,7 +316,7 @@ function generateHTML(symbol: string, data: any[]): string {
       showgrid: false,
     },
     yaxis3: {
-      title: "Lag (ms)",
+      title: "Lag / Staleness (ms)",
       overlaying: "y",
       side: "right",
       position: 0.95,

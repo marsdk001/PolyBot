@@ -20,6 +20,7 @@ export class DeepcoinPerpSource {
     XRP: 0,
   };
 
+  public lastMessageTs = 0;
   constructor(
     private gbm: Record<AssetSymbol, Record<Exchange, GBMFairProbability>>,
     private onPriceUpdate: () => void
@@ -71,6 +72,7 @@ export class DeepcoinPerpSource {
       });
 
       this.ws.on("message", (data) => {
+        this.lastMessageTs = Date.now();
         const msgStr = data.toString();
 
         // Ignore pong responses

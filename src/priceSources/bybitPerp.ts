@@ -19,6 +19,7 @@ export class BybitPerpSource {
     XRP: 0,
   };
 
+  public lastMessageTs = 0;
   constructor(
     private gbm: Record<AssetSymbol, Record<Exchange, GBMFairProbability>>,
     private onPriceUpdate: () => void
@@ -50,6 +51,7 @@ export class BybitPerpSource {
       });
 
       this.ws.on("message", (data) => {
+        this.lastMessageTs = Date.now();
         try {
           const msg = JSON.parse(data.toString());
           if (msg.topic?.startsWith("publicTrade.") && msg.data) {

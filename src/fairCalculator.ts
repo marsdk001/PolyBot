@@ -84,10 +84,10 @@ export class FairCalculator {
   }
 
   private updateHybridFair(symbol: AssetSymbol, now: number) {
-    const gbm = this.gbm[symbol].BITFINEX;
+    const gbm = this.gbm[symbol].BINANCE;
 
-    const currentPrice = this.getCurrentPrice(symbol, "BITFINEX");
-    const startPrice = this.getStartPrice(symbol, "BITFINEX");
+    const currentPrice = this.getCurrentPrice(symbol, "BINANCE");
+    const startPrice = this.getStartPrice(symbol, "BINANCE");
     const marketStartTime = this.getMarketStartTime(symbol);
 
     if (currentPrice <= 0 || startPrice <= 0 || marketStartTime <= 0) return;
@@ -129,11 +129,30 @@ export class FairCalculator {
       .map(([, v]) => v)
       .filter((v) => v > 0 && v < 1);
 
+    const polyMid = this.getPolyBook(symbol).UP.mid;
+
     if (values.length === 0) {
-      return this.getPolyBook(symbol).UP.mid || 0.5;
+      return polyMid || 0.5;
     }
 
-    const average = values.reduce((sum, v) => sum + v, 0) / values.length;
-    return Math.max(0.001, Math.min(0.999, average)); // Clamp for safety
+    const rawAvg = values.reduce((sum, v) => sum + v, 0) / values.length;
+
+    if (!polyMid || polyMid <= 0) {
+      return Math.round(rawAvg * 200) / 200;
+    }
+
+    const diff = Math.abs(rawAvg - polyMid);
+    let exchangeWeight = 0;
+
+    // Dynamic weighting: Stick to Poly when diff is small, lead when diff is large (spike)
+    if (diff <= 0.025) exchangeWeight = 0.1;
+    else if (diff >= 0.045) exchangeWeight = 0.95;
+    else exchangeWeight = 0.1 + ((diff - 0.025) / 0.02) * 0.85;
+
+    const combined = rawAvg * exchangeWeight + polyMid * (1 - exchangeWeight);
+
+    // Round to nearest 0.5% (0.005)
+    const rounded = Math.round(combined * 200) / 200;
+    return Math.max(0.001, Math.min(0.999, rounded));
   }
 }

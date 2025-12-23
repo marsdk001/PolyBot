@@ -19,6 +19,7 @@ export class BitgetPerpSource {
     XRP: 0,
   };
 
+  public lastMessageTs = 0;
   constructor(
     private gbm: Record<AssetSymbol, Record<Exchange, GBMFairProbability>>,
     private onPriceUpdate: () => void
@@ -53,12 +54,13 @@ export class BitgetPerpSource {
           if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send("ping");
           }
-        }, 20000);
+        }, 5000);
 
         this.ws?.on("close", () => clearInterval(pingInterval));
       });
 
       this.ws.on("message", (data) => {
+        this.lastMessageTs = Date.now();
         const msgStr = data.toString();
         if (msgStr === "pong") return;
 
