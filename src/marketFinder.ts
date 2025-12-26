@@ -1,5 +1,6 @@
 // src/marketFinder.ts
 import { AssetSymbol } from "./types";
+import { DELTA_ANCHOR_EXCHANGE } from "./constants";
 
 export class MarketFinder {
   private tokenIdUp: string | null = null;
@@ -145,6 +146,11 @@ export class MarketFinder {
     symbol: "btc" | "eth" | "sol" | "xrp",
     openTimestampMs: number
   ) {
+    if (DELTA_ANCHOR_EXCHANGE === "COINBASE") {
+      const success = await this.fetchCoinbaseStartPrice(symbol, openTimestampMs);
+      if (success) return;
+    }
+
     const binanceSymbol =
       symbol === "btc"
         ? "BTCUSDT"
@@ -183,5 +189,50 @@ export class MarketFinder {
       console.warn(`⚠️ Failed to fetch start price for ${binanceSymbol}`);
       console.log(`⬇️ Will use first live tick as fallback`);
     }
+  }
+
+  private async fetchCoinbaseStartPrice(
+    symbol: "btc" | "eth" | "sol" | "xrp",
+    openTimestampMs: number
+  ): Promise<boolean> {
+    const product =
+      symbol === "btc"
+        ? "BTC-USD"
+        : symbol === "eth"
+        ? "ETH-USD"
+        : symbol === "sol"
+        ? "SOL-USD"
+        : "XRP-USD";
+
+    const startISO = new Date(openTimestampMs).toISOString();
+    const endISO = new Date(openTimestampMs + 15 * 60 * 1000).toISOString();
+
+    try {
+      const res = await fetch(
+        `https://api.exchange.coinbase.com/products/${product}/candles?granularity=900&start=${startISO}&end=${endISO}`
+      );
+      if (!res.ok) return false;
+      const data = (await res.json()) as any[];
+
+      if (Array.isArray(data) && data.length > 0) {
+        // Coinbase: [time, low, high, open, close, volume] -> Open is index 3
+        // API returns newest first, but we requested a specific 15m slice
+        const candle = data[data.length - 1];
+        const openPrice = candle[3];
+        this.setStartPrice(symbol, openPrice);
+        console.log(
+          `✅ True ${symbol.toUpperCase()} start price fetched: $${openPrice} (Coinbase 15m open)`
+        );
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  private setStartPrice(symbol: "btc" | "eth" | "sol" | "xrp", price: number) {
+    if (symbol === "btc") this.binanceBtcStartPrice = price;
+    else if (symbol === "eth") this.binanceEthStartPrice = price;
+    else if (symbol === "sol") this.binanceSolStartPrice = price;
+    else if (symbol === "xrp") this.binanceXrpStartPrice = price;
   }
 }

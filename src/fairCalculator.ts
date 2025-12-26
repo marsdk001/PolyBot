@@ -1,6 +1,7 @@
 // src/fairCalculator.ts
 import { AssetSymbol, Exchange, FairProbs, MarketBook } from "./types";
 import { GBMFairProbability } from "./gbm";
+import { ACTIVE_EXCHANGES, DELTA_ANCHOR_EXCHANGE } from "./constants";
 
 export class FairCalculator {
   // Hybrid fair probabilities (main output)
@@ -13,6 +14,22 @@ export class FairCalculator {
 
   // Per-exchange UP probabilities
   public fairByExchange: Record<AssetSymbol, Record<Exchange, number>> = {
+    BTC: {} as Record<Exchange, number>,
+    ETH: {} as Record<Exchange, number>,
+    SOL: {} as Record<Exchange, number>,
+    XRP: {} as Record<Exchange, number>,
+  };
+
+  // Basis: Poly - GBM (The structural offset)
+  private basis: Record<AssetSymbol, Record<Exchange, number>> = {
+    BTC: {} as Record<Exchange, number>,
+    ETH: {} as Record<Exchange, number>,
+    SOL: {} as Record<Exchange, number>,
+    XRP: {} as Record<Exchange, number>,
+  };
+
+  // Latch Timer: Tracks how long we've been diverged (for timeout)
+  private latchStart: Record<AssetSymbol, Record<Exchange, number>> = {
     BTC: {} as Record<Exchange, number>,
     ETH: {} as Record<Exchange, number>,
     SOL: {} as Record<Exchange, number>,
@@ -46,17 +63,7 @@ export class FairCalculator {
     const minsLeft = (marketStartTime + 900_000 - now) / 60_000;
     if (minsLeft <= 0) return;
 
-    const exchanges: Exchange[] = [
-      "BINANCE",
-      "BYBIT",
-      "GATE",
-      "OKX",
-      "MEXC",
-      "BITGET",
-      "DEEPCOIN",
-    ];
-
-    exchanges.forEach((exch) => {
+    ACTIVE_EXCHANGES.forEach((exch) => {
       const currentPrice = this.getCurrentPrice(symbol, exch);
       const startPrice = this.getStartPrice(symbol, exch);
 
@@ -73,21 +80,68 @@ export class FairCalculator {
 
       const polyUp = this.getPolyBook(symbol).UP.mid;
 
-      // Light tether to Poly (15%)
-      const tethered = fairUp * 0.85 + polyUp * 0.15;
+      // Basis Calibration & Spike Logic
+      // 1. Calculate velocity of underlying asset
+      const recentPct = this.gbm[symbol][exch].getRecentPctChange(500);
+      const isSpike = Math.abs(recentPct) > 0.035; // > 0.05% move in 1s
+
+      if (polyUp > 0) {
+        // Initialize basis if missing
+        if (this.basis[symbol][exch] === undefined) {
+          this.basis[symbol][exch] = polyUp - fairUp;
+        }
+
+        // If calm, update basis to align GBM with Poly (Basis = Poly - GBM)
+        // If spiking, freeze basis at pre-spike level
+        if (isSpike) {
+          // Spike detected: Reset latch timer, freeze basis (let Fair move away from Poly)
+          this.latchStart[symbol][exch] = 0;
+        } else {
+          const currentBasis = this.basis[symbol][exch];
+          const projectedFair = fairUp + currentBasis;
+          const diff = Math.abs(projectedFair - polyUp);
+          const rawDiff = Math.abs(fairUp - polyUp);
+
+          // Convergence Latch with Timeout
+          if (diff < 0.005 || rawDiff < 0.005) {
+            // Converged: Snap basis to track Poly precisely
+            this.basis[symbol][exch] = polyUp - fairUp;
+            this.latchStart[symbol][exch] = 0;
+          } else {
+            // Diverged: Check timeout
+            if (!this.latchStart[symbol][exch]) {
+              this.latchStart[symbol][exch] = now;
+            }
+
+            // If diverged for > 3 seconds, give up and snap (prevent permanent divergence)
+            // Otherwise, hold basis frozen (no smoothing)
+            if (now - this.latchStart[symbol][exch] > 3000) {
+              this.basis[symbol][exch] = polyUp - fairUp;
+              this.latchStart[symbol][exch] = 0;
+            }
+          }
+        }
+      }
+
+      const currentBasis = this.basis[symbol][exch] || 0;
+      const calibratedFair = fairUp + currentBasis;
 
       this.fairByExchange[symbol][exch] = Math.max(
         0.001,
-        Math.min(0.999, tethered)
+        Math.min(0.999, calibratedFair)
       );
     });
   }
 
   private updateHybridFair(symbol: AssetSymbol, now: number) {
-    const gbm = this.gbm[symbol].BINANCE;
+    // Use the configured Anchor Exchange for the main hybrid calculation
+    // If Anchor is AVERAGE, fallback to BINANCE for volatility (GBM) source
+    const anchor =
+      (DELTA_ANCHOR_EXCHANGE as string) === "AVERAGE" ? "BINANCE" : (DELTA_ANCHOR_EXCHANGE as Exchange);
+    const gbm = this.gbm[symbol][anchor];
 
-    const currentPrice = this.getCurrentPrice(symbol, "BINANCE");
-    const startPrice = this.getStartPrice(symbol, "BINANCE");
+    const currentPrice = this.getCurrentPrice(symbol, anchor);
+    const startPrice = this.getStartPrice(symbol, anchor);
     const marketStartTime = this.getMarketStartTime(symbol);
 
     if (currentPrice <= 0 || startPrice <= 0 || marketStartTime <= 0) return;
@@ -101,13 +155,9 @@ export class FairCalculator {
     const polyDown = this.getPolyBook(symbol).DOWN.mid;
     if (polyUp <= 0 || polyDown <= 0) return;
 
-    const moneyness = Math.abs(Math.log(currentPrice / startPrice));
-    const timeFactor = Math.min(1, minsLeft / 15);
-
-    let alpha = 0.25 + 0.65 * (1 - Math.exp(-moneyness * 4)) * (1 - timeFactor);
-    alpha = Math.max(0.15, Math.min(0.9, alpha));
-
-    const hybridUp = (1 - alpha) * gbmFair.UP + alpha * polyUp;
+    // Apply Basis Calibration to Hybrid Fair as well
+    const currentBasis = this.basis[symbol][anchor] || 0;
+    const hybridUp = gbmFair.UP + currentBasis;
     const clampedUp = Math.max(0.001, Math.min(0.999, hybridUp));
 
     this.fairProbs[symbol].UP = clampedUp;
@@ -125,7 +175,7 @@ export class FairCalculator {
 
   getCombinedExchangeFair(symbol: AssetSymbol): number {
     const values = Object.entries(this.fairByExchange[symbol])
-      .filter(([exch]) => exch !== "BINANCE" && exch !== "DEEPCOIN" && exch !== "BITFINEX")
+      .filter(([exch]) => exch !== DELTA_ANCHOR_EXCHANGE && exch !== "DEEPCOIN" && exch !== "COINBASE" && exch !== "BINANCE")
       .map(([, v]) => v)
       .filter((v) => v > 0 && v < 1);
 
@@ -138,21 +188,10 @@ export class FairCalculator {
     const rawAvg = values.reduce((sum, v) => sum + v, 0) / values.length;
 
     if (!polyMid || polyMid <= 0) {
-      return Math.round(rawAvg * 200) / 200;
+      return rawAvg;
     }
 
-    const diff = Math.abs(rawAvg - polyMid);
-    let exchangeWeight = 0;
-
-    // Dynamic weighting: Stick to Poly when diff is small, lead when diff is large (spike)
-    if (diff <= 0.025) exchangeWeight = 0.1;
-    else if (diff >= 0.045) exchangeWeight = 0.95;
-    else exchangeWeight = 0.1 + ((diff - 0.025) / 0.02) * 0.85;
-
-    const combined = rawAvg * exchangeWeight + polyMid * (1 - exchangeWeight);
-
-    // Round to nearest 0.5% (0.005)
-    const rounded = Math.round(combined * 200) / 200;
-    return Math.max(0.001, Math.min(0.999, rounded));
+    // Since individual fairs are already calibrated to Poly, we just average them.
+    return Math.max(0.001, Math.min(0.999, rawAvg));
   }
 }

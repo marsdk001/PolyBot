@@ -2,7 +2,6 @@
 
 export type Exchange =
   | "BINANCE"
-  | "BITFINEX"
   | "BYBIT"
   | "GATE"
   | "OKX"
@@ -10,7 +9,9 @@ export type Exchange =
   | "HYPER"
   | "MEXC"
   | "BITGET"
-  | "DEEPCOIN";
+  | "DEEPCOIN"
+  | "COINBASE"
+  | "AVERAGE";
 
 // Forward declaration: we don't need the full class, just the shape for mapping
 export type GBMFairProbabilityInstance = {
@@ -40,6 +41,8 @@ export type PlotPoint = {
   mexcStaleness?: number;
   bitgetStaleness?: number;
   deepcoinStaleness?: number;
+  coinbaseStaleness?: number;
+  polyStaleness?: number;
 
   // Base delta (Binance reference)
   pctDelta: number;
@@ -53,6 +56,10 @@ export type PlotPoint = {
   deltaMexc?: number;
   deltaBitget?: number;
   deltaDeepcoin?: number;
+  deltaCoinbase?: number;
+  deltaBinance?: number;
+
+  diff?: number;
 
   // 🔹 Hybrid fair (current production logic)
   fairUp?: number;
@@ -70,6 +77,7 @@ export type PlotPoint = {
   fairMexc?: number;
   fairBitget?: number;
   fairDeepcoin?: number;
+  fairCoinbase?: number;
 
   // Polymarket mids
   polyUp?: number;

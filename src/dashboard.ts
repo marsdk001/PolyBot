@@ -34,10 +34,17 @@ export class Dashboard {
         : { color: RED, arrow: "▼" };
     };
 
-    const btc = getColorAndArrow("BTC");
-    const eth = getColorAndArrow("ETH");
-    const sol = getColorAndArrow("SOL");
-    const xrp = getColorAndArrow("XRP");
+    const mkLine = (sym: AssetSymbol, col: string, dec: number) => {
+      const p = prices[sym];
+      const s = startPrices[sym];
+      const t = timeLeft[sym];
+      const { color: c, arrow: a } = getColorAndArrow(sym);
+      const dollarDiff = p - s;
+
+      const line = `║ ${col}${sym}${RESET} • ${t.toString().padEnd(3)}s left │ [${s.toFixed(dec)}] $${p.toFixed(dec).padEnd(9)} ${c}${a} ($${Math.abs(dollarDiff).toFixed(dec)})${RESET}`;
+      const visibleLen = line.replace(/\x1b\[[0-9;]*m/g, "").length;
+      return line + " ".repeat(Math.max(0, 62 - visibleLen)) + "║";
+    };
 
     const dashboard = [
       `╔══════════════════════════════════════════════════════════════╗`,
@@ -45,15 +52,7 @@ export class Dashboard {
       `╠══════════════════════════════════════════════════════════════╣`,
 
       // BTC block
-      `║ ${COLOR_BTC}BTC${RESET} • ${timeLeft.BTC.toString().padEnd(
-        3
-      )}s left │ $${prices.BTC.toFixed(2).padEnd(10)} ${btc.color}${
-        btc.arrow
-      }${RESET} ${(prices.BTC - startPrices.BTC).toFixed(2).padStart(8)} ${
-        btc.color
-      }(${(((prices.BTC - startPrices.BTC) / startPrices.BTC) * 100).toFixed(
-        3
-      )}%)${RESET} ║`,
+      mkLine("BTC", COLOR_BTC, 2),
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         combinedFair.BTC.UP
       )}${RESET}  ${RED}DOWN ${this.fmtPct(
@@ -71,15 +70,7 @@ export class Dashboard {
       )}${RESET}                                 ║`,
 
       // ETH block
-      `║ ${COLOR_ETH}ETH${RESET} • ${timeLeft.ETH.toString().padEnd(
-        3
-      )}s left │ $${prices.ETH.toFixed(2).padEnd(10)} ${eth.color}${
-        eth.arrow
-      }${RESET} ${(prices.ETH - startPrices.ETH).toFixed(2).padStart(8)} ${
-        eth.color
-      }(${(((prices.ETH - startPrices.ETH) / startPrices.ETH) * 100).toFixed(
-        3
-      )}%)${RESET} ║`,
+      mkLine("ETH", COLOR_ETH, 2),
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         combinedFair.ETH.UP
       )}${RESET}  ${RED}DOWN ${this.fmtPct(
@@ -97,15 +88,7 @@ export class Dashboard {
       )}${RESET}                                 ║`,
 
       // SOL block
-      `║ ${COLOR_SOL}SOL${RESET} • ${timeLeft.SOL.toString().padEnd(
-        3
-      )}s left │ $${prices.SOL.toFixed(4).padEnd(10)} ${sol.color}${
-        sol.arrow
-      }${RESET} ${(prices.SOL - startPrices.SOL).toFixed(4).padStart(8)} ${
-        sol.color
-      }(${(((prices.SOL - startPrices.SOL) / startPrices.SOL) * 100).toFixed(
-        3
-      )}%)${RESET} ║`,
+      mkLine("SOL", COLOR_SOL, 4),
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         combinedFair.SOL.UP
       )}${RESET}  ${RED}DOWN ${this.fmtPct(
@@ -123,15 +106,7 @@ export class Dashboard {
       )}${RESET}                                 ║`,
 
       // XRP block
-      `║ ${COLOR_XRP}XRP${RESET} • ${timeLeft.XRP.toString().padEnd(
-        3
-      )}s left │ $${prices.XRP.toFixed(4).padEnd(10)} ${xrp.color}${
-        xrp.arrow
-      }${RESET} ${(prices.XRP - startPrices.XRP).toFixed(4).padStart(8)} ${
-        xrp.color
-      }(${(((prices.XRP - startPrices.XRP) / startPrices.XRP) * 100).toFixed(
-        3
-      )}%)${RESET} ║`,
+      mkLine("XRP", COLOR_XRP, 4),
       `║   Fair  ${GREEN}UP ${this.fmtPct(
         combinedFair.XRP.UP
       )}${RESET}  ${RED}DOWN ${this.fmtPct(

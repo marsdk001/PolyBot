@@ -5,6 +5,7 @@ import { AssetSymbol, MarketBook, PolyPoint, FairProbs } from "./types";
 export class PolymarketWs {
   private ws: WebSocket | null = null;
   private running = true;
+  public lastMessageTs = 0;
 
   public book: Record<AssetSymbol, Record<"UP" | "DOWN", MarketBook>> = {
     BTC: { UP: { bid: 0, ask: 0, mid: 0 }, DOWN: { bid: 0, ask: 0, mid: 0 } },
@@ -48,6 +49,15 @@ export class PolymarketWs {
         }
       }, 5000);
 
+      // Health watchdog
+      const healthInterval = setInterval(() => {
+        const age = Date.now() - this.lastMessageTs;
+        if (age > 15000) {
+          console.warn(`⚠️ Polymarket WS stale (${age}ms) → forcing reconnect`);
+          this.ws?.terminate();
+        }
+      }, 2000);
+
       this.ws.on("open", () => {
         reconnectAttempts = 0;
         console.log("✅ Polymarket WS connected");
@@ -62,6 +72,7 @@ export class PolymarketWs {
       });
 
       this.ws.on("message", (data) => {
+        this.lastMessageTs = Date.now();
         try {
           const msg = JSON.parse(data.toString());
           if (msg === "PONG") return;
@@ -72,12 +83,14 @@ export class PolymarketWs {
 
       this.ws.on("close", () => {
         clearInterval(pingInterval);
+        clearInterval(healthInterval);
         console.log("🔌 Polymarket WS closed → reconnecting...");
         setTimeout(connect, Math.min(1000 * ++reconnectAttempts, 8000));
       });
 
       this.ws.on("error", () => {
         clearInterval(pingInterval);
+        clearInterval(healthInterval);
         this.ws?.close();
       });
     };

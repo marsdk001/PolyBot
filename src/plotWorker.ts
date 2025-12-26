@@ -41,7 +41,7 @@ parentPort?.on("message", async (msg) => {
 });
 
 function generateHTML(symbol: string, data: any[]): string {
-  const t = data.map((d: any) => new Date(d.ts));
+  const t = data.map((d: any) => d.ts);
 
   const traces = [
     // Poly
@@ -161,6 +161,16 @@ function generateHTML(symbol: string, data: any[]): string {
       marker: { size: 2 },
       visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
     },
+    {
+      x: t,
+      y: data.map((d: any) => d.fairCoinbase),
+      name: "Fair Coinbase",
+      yaxis: "y1",
+      line: { color: "#0055ff" },
+      mode: "lines+markers",
+      marker: { size: 2 },
+      visible: PLOT_VISIBLE_FAIR_INDIVIDUAL,
+    },
 
     // Price % deltas
     {
@@ -222,6 +232,37 @@ function generateHTML(symbol: string, data: any[]): string {
       mode: "lines+markers",
       marker: { size: 2 },
       visible: PLOT_VISIBLE_DELTAS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.deltaCoinbase),
+      name: "% Δ Coinbase",
+      yaxis: "y2",
+      line: { width: 2, color: "#0055ff" },
+      mode: "lines+markers",
+      marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.deltaBinance),
+      name: "% Δ Binance",
+      yaxis: "y2",
+      line: { width: 2, color: "#f0b90b" },
+      mode: "lines+markers",
+      marker: { size: 2 },
+      visible: PLOT_VISIBLE_DELTAS,
+    },
+    
+    // Diff (Abs Edge)
+    {
+      x: t,
+      y: data.map((d: any) => d.diff),
+      name: "Diff (Abs Edge)",
+      yaxis: "y2",
+      line: { width: 2, color: "#ff0000", dash: "dot" },
+      mode: "lines",
+      visible: true,
     },
 
     // Loop Lag
@@ -289,6 +330,24 @@ function generateHTML(symbol: string, data: any[]): string {
       mode: "lines",
       visible: PLOT_VISIBLE_STALENESS,
     },
+    {
+      x: t,
+      y: data.map((d: any) => d.coinbaseStaleness),
+      name: "Coinbase Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#0055ff" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
+    {
+      x: t,
+      y: data.map((d: any) => d.polyStaleness),
+      name: "Poly Staleness (ms)",
+      yaxis: "y3",
+      line: { width: 1, color: "#666666" },
+      mode: "lines",
+      visible: PLOT_VISIBLE_STALENESS,
+    },
   ];
 
 
@@ -297,6 +356,7 @@ function generateHTML(symbol: string, data: any[]): string {
     title: `${symbol} – 1 Minute Multi-Exchange Snapshot`,
     hovermode: "x unified",
     xaxis: {
+      type: "date",
       title: "Time",
       showspikes: true,
       spikemode: "across",

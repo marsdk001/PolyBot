@@ -1,6 +1,7 @@
 // src/constants.ts
 import * as path from "path";
 import * as fs from "fs";
+import { Exchange } from "./types";
 
 export const PLOT_INTERVAL_SEC = 60; // 5 minutes (CHANGE TO 3600 LATER)
 export const SAMPLE_INTERVAL_MS = 50;
@@ -11,7 +12,19 @@ export const PLOT_POINTS = (PLOT_INTERVAL_SEC * 1000) / SAMPLE_INTERVAL_MS;
 export const PLOTS_DIR = path.resolve(process.cwd(), "plots");
 
 // === Anchor Exchange for Deltas ===
-export const DELTA_ANCHOR_EXCHANGE = "BINANCE"; // Change this to your preferred anchor
+export const DELTA_ANCHOR_EXCHANGE = "COINBASE"; // Change this to your preferred anchor
+
+// === Active Exchanges Configuration ===
+export const ACTIVE_EXCHANGES: Exchange[] = [
+  "BINANCE",
+  "BYBIT",
+  "GATE",
+  "OKX",
+  "MEXC",
+  "BITGET",
+  "DEEPCOIN",
+  "COINBASE",
+];
 
 // === Plot Visibility Configuration ===
 export const PLOT_VISIBLE_POLY_UP = true;

@@ -121,27 +121,16 @@ export class GBMFairProbability {
     }
 
     const tau = minutesRemaining;
-    const baseSigma = this.estimateVolatilityPerMinute();
+    let sigma = this.estimateVolatilityPerMinute();
 
-    // --- Spike / shock detection ---
-    const recentPct = Math.abs(this.getRecentPctChange(2000)); // 2s shock
-    const spikeThreshold = 0.15; // % move considered a shock
-    const spikeSeverity = Math.min(1, recentPct / spikeThreshold);
-
-    // --- Option-aware weighting ---
-    const moneyness = Math.abs(Math.log(currentPrice / startPrice));
-    const timeFactor = Math.min(1, tau / 15);
-
-    // Spike relevance decays with distance & time
-    const shockWeight = spikeSeverity * Math.exp(-moneyness * 6) * timeFactor;
-
-    // Inflate sigma (vega effect)
-    const effectiveSigma = baseSigma * (1 + shockWeight * 1.5);
+    // --- 2. Gamma / Gap Risk (Theta) ---
+    // As time -> 0, enforce a higher volatility floor to represent execution/gap risk.
+    // This prevents probabilities from snapping to 0/1 too aggressively in the final seconds.
+    const gapRisk = 0.001 / Math.max(0.1, Math.sqrt(tau));
+    sigma = Math.max(sigma, gapRisk);
 
     const d =
-      (Math.log(currentPrice / startPrice) -
-        effectiveSigma * effectiveSigma * 0.5 * tau) /
-      (effectiveSigma * Math.sqrt(tau));
+      Math.log(currentPrice / startPrice) / (sigma * Math.sqrt(tau));
 
     let fairUp = this.normCDF(d);
     fairUp = Math.max(0.001, Math.min(0.999, fairUp));

@@ -10,7 +10,7 @@ import { GatePerpSource } from "./priceSources/gatePerp";
 import { OkxPerpSource } from "./priceSources/okxPerp";
 import { MexcPerpSource } from "./priceSources/mexcPerp";
 import { BitgetPerpSource } from "./priceSources/bitgetPerp";
-import { DeepcoinPerpSource } from "./priceSources/deepcoinPerp";
+import { CoinbaseSpotSource } from "./priceSources/coinbaseSpot";
 import { PolymarketWs } from "./polymarketWs";
 import { FairCalculator } from "./fairCalculator";
 import { TradingLogic } from "./tradingLogic";
@@ -21,6 +21,7 @@ import {
   LOGIC_INTERVAL_MS,
   DASHBOARD_INTERVAL_MS,
   TRADING_LOOP_MS,
+  ACTIVE_EXCHANGES,
 } from "./constants";
 import { AssetSymbol, Exchange, PlotPoint, FairProbs } from "./types";
 import readline from "readline";
@@ -44,6 +45,7 @@ export class AutoTradingBot {
   private okxSource: OkxPerpSource;
   private mexcSource: MexcPerpSource;
   private bitgetSource: BitgetPerpSource;
+  private coinbaseSource: CoinbaseSpotSource;
 
   // Shared state for easy access
   private prices: Record<AssetSymbol, number> = {
@@ -126,20 +128,12 @@ export class AutoTradingBot {
     this.okxSource = new OkxPerpSource(this.gbm, onPriceUpdate);
     this.mexcSource = new MexcPerpSource(this.gbm, onPriceUpdate);
     this.bitgetSource = new BitgetPerpSource(this.gbm, onPriceUpdate);
+    this.coinbaseSource = new CoinbaseSpotSource(this.gbm, onPriceUpdate);
   }
 
   private initExchangeGBMs() {
-    const exchanges: Exchange[] = [
-      "BINANCE",
-      "BYBIT",
-      "GATE",
-      "OKX",
-      "MEXC",
-      "BITGET",
-      "DEEPCOIN",
-    ];
     const map: Partial<Record<Exchange, GBMFairProbability>> = {};
-    exchanges.forEach((ex) => {
+    ACTIVE_EXCHANGES.forEach((ex) => {
       map[ex] = new GBMFairProbability(0.985, 0.00025);
     });
     return map as Record<Exchange, GBMFairProbability>;
@@ -176,6 +170,19 @@ export class AutoTradingBot {
   }
 
   private getCurrentPrice(symbol: AssetSymbol, exchange: Exchange): number {
+    if (exchange === "AVERAGE") {
+      let sum = 0;
+      let count = 0;
+      for (const ex of ACTIVE_EXCHANGES) {
+        const p = this.getCurrentPrice(symbol, ex);
+        if (p > 0) {
+          sum += p;
+          count++;
+        }
+      }
+      return count > 0 ? sum / count : 0;
+    }
+
     if (exchange === "BINANCE") {
       const map: Record<AssetSymbol, number> = {
         BTC: this.binanceSource.binanceBtcPrice,
@@ -236,6 +243,16 @@ export class AutoTradingBot {
       };
       return map[symbol] ?? 0;
     }
+
+    if (exchange === "COINBASE") {
+      const map: Record<AssetSymbol, number> = {
+        BTC: this.coinbaseSource.coinbaseBTCPrice,
+        ETH: this.coinbaseSource.coinbaseETHPrice,
+        SOL: this.coinbaseSource.coinbaseSOLPrice,
+        XRP: this.coinbaseSource.coinbaseXRPPrice,
+      };
+      return map[symbol] ?? 0;
+    }
     // Final fallback
     return this.startPrices[symbol] || 0;
   }
@@ -254,6 +271,10 @@ export class AutoTradingBot {
         return this.mexcSource.mexcStartPrices[symbol];
       case "BITGET":
         return this.bitgetSource.bitgetStartPrices[symbol];
+      case "COINBASE":
+        return this.coinbaseSource.coinbaseStartPrices[symbol];
+      case "AVERAGE":
+        return this.startPrices[symbol];
       default:
         return 0;
     }
@@ -283,6 +304,7 @@ export class AutoTradingBot {
         this.okxSource.okxStartPrices[symbol] = startPrice;
         this.mexcSource.mexcStartPrices[symbol] = startPrice;
         this.bitgetSource.bitgetStartPrices[symbol] = startPrice;
+        this.coinbaseSource.coinbaseStartPrices[symbol] = startPrice;
 
         console.log(
           `🎯 Initial ${symbol} start — time: ${new Date(
@@ -307,6 +329,7 @@ export class AutoTradingBot {
     this.okxSource.connect();
     this.mexcSource.connect();
     this.bitgetSource.connect();
+    this.coinbaseSource.connect();
     // this.deepcoinSource.connect();
     this.polymarketWs.connect();
 
@@ -447,7 +470,23 @@ export class AutoTradingBot {
     //     This ensures everything stays in sync even if only one expired
     (["BTC", "ETH", "SOL", "XRP"] as AssetSymbol[]).forEach((symbol) => {
       const newStartTime = this.marketFinder.getStartTime(symbol);
-      const newStartPrice = this.marketFinder.getStartPrice(symbol);
+      let newStartPrice = this.marketFinder.getStartPrice(symbol);
+
+      // If using a custom anchor (not Binance), snapshot its current price as the start price
+      if ((DELTA_ANCHOR_EXCHANGE as string) !== "BINANCE") {
+        const anchorPrice = this.getCurrentPrice(
+          symbol,
+          DELTA_ANCHOR_EXCHANGE as Exchange
+        );
+        if (anchorPrice > 0) {
+          newStartPrice = anchorPrice;
+          console.log(
+            `⚖️ Snapped ${symbol} start price to ${DELTA_ANCHOR_EXCHANGE}: $${newStartPrice.toFixed(
+              2
+            )}`
+          );
+        }
+      }
 
       if (newStartTime > 0 && newStartPrice > 0) {
         // Update bot's central start time & price
@@ -460,6 +499,7 @@ export class AutoTradingBot {
         this.okxSource.okxStartPrices[symbol] = newStartPrice;
         this.mexcSource.mexcStartPrices[symbol] = newStartPrice;
         this.bitgetSource.bitgetStartPrices[symbol] = newStartPrice;
+        this.coinbaseSource.coinbaseStartPrices[symbol] = newStartPrice;
 
         console.log(
           `🎯 ${symbol} rollover — new start time: ${new Date(
@@ -502,6 +542,8 @@ export class AutoTradingBot {
     const okxStaleness = now - this.okxSource.lastMessageTs;
     const mexcStaleness = now - this.mexcSource.lastMessageTs;
     const bitgetStaleness = now - this.bitgetSource.lastMessageTs;
+    const coinbaseStaleness = now - this.coinbaseSource.lastMessageTs;
+    const polyStaleness = now - this.polymarketWs.lastMessageTs;
 
     (["BTC", "ETH", "SOL", "XRP"] as AssetSymbol[]).forEach((symbol) => {
       // Anchor (reference)
@@ -509,6 +551,17 @@ export class AutoTradingBot {
       const anchorStart = this.startPrices[symbol];
       const anchorDelta =
         anchorStart > 0 ? ((anchorPrice - anchorStart) / anchorStart) * 100 : 0;
+
+      // Binance
+      const binSuffix = symbol.charAt(0) + symbol.slice(1).toLowerCase();
+      const binancePrice = this.binanceSource[
+        `binance${binSuffix}Price` as keyof BinancePerpSource
+      ] as number;
+      const binanceStart = this.binanceSource.binanceStartPrices[symbol];
+      const binanceDelta =
+        binanceStart > 0
+          ? ((binancePrice - binanceStart) / binanceStart) * 100
+          : undefined;
 
       // Bybit
       const bybitPrice = this.bybitSource[
@@ -554,6 +607,18 @@ export class AutoTradingBot {
           ? ((bitgetPrice - bitgetStart) / bitgetStart) * 100
           : undefined;
 
+      // Coinbase
+      const coinbasePrice = this.coinbaseSource[
+        `coinbase${symbol}Price` as keyof CoinbaseSpotSource
+      ] as number;
+      const coinbaseStart = this.coinbaseSource.coinbaseStartPrices[symbol];
+      const coinbaseDelta =
+        coinbaseStart > 0 ? ((coinbasePrice - coinbaseStart) / coinbaseStart) * 100 : undefined;
+
+      const combinedFairValue = this.fairCalculator.getCombinedExchangeFair(symbol);
+      const polyUpVal = this.polymarketWs.book[symbol].UP.mid;
+      const diff = Math.abs(combinedFairValue - polyUpVal) * 100;
+
       this.plotBuffers[symbol].add({
         ts: now,
         loopLag: lag,
@@ -563,6 +628,8 @@ export class AutoTradingBot {
         okxStaleness: okxStaleness,
         mexcStaleness: mexcStaleness,
         bitgetStaleness: bitgetStaleness,
+        coinbaseStaleness: coinbaseStaleness,
+        polyStaleness: polyStaleness,
 
         // Price % deltas (pctDelta is now the Anchor delta)
         pctDelta: anchorDelta,
@@ -571,11 +638,15 @@ export class AutoTradingBot {
         deltaOkx: okxDelta,
         deltaMexc: mexcDelta,
         deltaBitget: bitgetDelta,
+        deltaCoinbase: coinbaseDelta,
+        deltaBinance: binanceDelta,
+        
+        diff,
 
         // Fair probabilities
         fairUp: this.fairCalculator.fairProbs[symbol].UP * 100,
         fairDown: this.fairCalculator.fairProbs[symbol].DOWN * 100,
-        fairCombined: this.fairCalculator.getCombinedExchangeFair(symbol) * 100,
+        fairCombined: combinedFairValue * 100,
 
         // Per-exchange fair (UP %)
         fairBinance: this.fairCalculator.fairByExchange[symbol]?.BINANCE * 100,
@@ -586,18 +657,17 @@ export class AutoTradingBot {
         fairBitget: this.fairCalculator.fairByExchange[symbol]?.BITGET * 100,
         fairDeepcoin:
           this.fairCalculator.fairByExchange[symbol]?.DEEPCOIN * 100,
+        fairCoinbase: this.fairCalculator.fairByExchange[symbol]?.COINBASE * 100,
 
         // Polymarket
-        polyUp: this.polymarketWs.book[symbol].UP.mid * 100,
+        polyUp: polyUpVal * 100,
         polyDown: this.polymarketWs.book[symbol].DOWN.mid * 100,
 
         // Edge
         edgeUp:
-          (this.fairCalculator.fairProbs[symbol].UP -
-            this.polymarketWs.book[symbol].UP.mid) *
-          100,
+          (combinedFairValue - polyUpVal) * 100,
         edgeDown:
-          (this.fairCalculator.fairProbs[symbol].DOWN -
+          ((1 - combinedFairValue) -
             this.polymarketWs.book[symbol].DOWN.mid) *
           100,
       });
