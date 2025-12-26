@@ -4,7 +4,7 @@ import { Wallet } from "@ethersproject/wallet";
 import { config } from "./config";
 
 export class PolymarketClient {
-  private wallet: Wallet;
+  public wallet: Wallet;
   public client: ClobClient;
 
   constructor() {

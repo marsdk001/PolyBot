@@ -15,6 +15,7 @@ import { PolymarketWs } from "./polymarketWs";
 import { FairCalculator } from "./fairCalculator";
 import { TradingLogic } from "./tradingLogic";
 import { Dashboard } from "./dashboard";
+import { BalanceChecker } from "./balance_checker";
 import {
   SAMPLE_INTERVAL_MS,
   DELTA_ANCHOR_EXCHANGE,
@@ -36,6 +37,7 @@ export class AutoTradingBot {
   private fairCalculator: FairCalculator;
   private tradingLogic: TradingLogic;
   private dashboard = new Dashboard();
+  private balanceChecker = new BalanceChecker();
   private tradingEnabled = false; // Default: trading OFF
 
   // Price sources
@@ -140,15 +142,20 @@ export class AutoTradingBot {
   }
 
   private setupTradingToggle() {
+    if (!process.stdin.isTTY) {
+      console.log("⚠️ Non-interactive environment detected (VPS/PM2). Trading toggle via stdin disabled.");
+      return;
+    }
+
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
       terminal: false,
     });
 
-    console.log("🔧 Trading toggle active — type 'trade on/off' or 'status'");
+    console.log("🔧 Trading toggle active — type 'trade on/off', 'status' or 'balance'");
 
-    rl.on("line", (line) => {
+    rl.on("line", async (line) => {
       const cmd = line.trim().toLowerCase();
 
       if (cmd === "trade on") {
@@ -163,8 +170,16 @@ export class AutoTradingBot {
             this.tradingEnabled ? "ENABLED" : "DISABLED"
           }`
         );
+      } else if (cmd === "balance") {
+        console.log("Checking balances...");
+        try {
+          const balances = await this.balanceChecker.checkBalances(this.polymarketClient.wallet);
+          this.balanceChecker.displayBalances(balances);
+        } catch (err) {
+          console.error("❌ Failed to check balance:", err);
+        }
       } else if (cmd === "help" || cmd === "?") {
-        console.log("Commands: 'trade on' | 'trade off' | 'status' | 'help'");
+        console.log("Commands: 'trade on' | 'trade off' | 'status' | 'balance' | 'help'");
       }
     });
   }
@@ -281,7 +296,9 @@ export class AutoTradingBot {
   }
 
   async start() {
-    console.clear();
+    if (process.stdout.isTTY) {
+      console.clear();
+    }
     console.log(
       "Binance Perp + Multi-Exchange GBM → Polymarket Arbitrage Bot\n"
     );

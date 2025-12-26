@@ -33,6 +33,9 @@ parentPort?.on("message", async (msg) => {
     const filepath = path.join(plotsDir, filename);
 
     await fs.promises.writeFile(filepath, html, "utf8");
+
+    // Cleanup old files (keep 24h = 1440 mins)
+    await cleanupOldPlots(plotsDir, symbol, 1440);
     
     // Optional: Notify main thread of success (fire and forget usually fine here)
   } catch (err) {
@@ -401,4 +404,24 @@ function generateHTML(symbol: string, data: any[]): string {
 </script>
 </body>
 </html>`;
+}
+
+async function cleanupOldPlots(dir: string, symbol: string, keepCount: number) {
+  try {
+    const files = await fs.promises.readdir(dir);
+    // Filter for files belonging to this symbol
+    const targetFiles = files.filter((f) => f.startsWith(`${symbol}_`) && f.endsWith(".html"));
+
+    if (targetFiles.length <= keepCount) return;
+
+    // Sort alphabetically (works because filename contains YYYY-MM-DD_HH-MM)
+    targetFiles.sort();
+
+    const toDelete = targetFiles.slice(0, targetFiles.length - keepCount);
+    for (const file of toDelete) {
+      await fs.promises.unlink(path.join(dir, file));
+    }
+  } catch (err) {
+    // Ignore errors (e.g. race conditions) to keep worker alive
+  }
 }
