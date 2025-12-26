@@ -1,0 +1,27 @@
+[2025-12-26T07:28:23.217Z] [INFO] 📝 Logging initialized. Outputting to: C:\Users\PC\source\repos\polymarket-trading-bot\logs\bot.log
+[2025-12-26T07:28:23.219Z] [INFO] Binance Perp + Multi-Exchange GBM → Polymarket Arbitrage Bot
+
+[2025-12-26T07:28:23.220Z] [INFO] 📂 Working Directory: C:\Users\PC\source\repos\polymarket-trading-bot
+[2025-12-26T07:28:23.220Z] [INFO] 💾 Plots Directory: C:\Users\PC\source\repos\polymarket-trading-bot\plots
+[2025-12-26T07:28:23.511Z] [INFO] ✅ Plot Worker is online
+[2025-12-26T07:28:23.559Z] [INFO] ✅ Found new SOL market: Solana Up or Down - December 26, 2:15AM-2:30AM ET (starts 2:15:00 PM)
+[2025-12-26T07:28:23.561Z] [INFO] ✅ Found new ETH market: Ethereum Up or Down - December 26, 2:15AM-2:30AM ET (starts 2:15:00 PM)
+[2025-12-26T07:28:23.567Z] [INFO] ✅ Found new XRP market: XRP Up or Down - December 26, 2:15AM-2:30AM ET (starts 2:15:00 PM)
+[2025-12-26T07:28:23.569Z] [INFO] ✅ Found new BTC market: Bitcoin Up or Down - December 26, 2:15AM-2:30AM ET (starts 2:15:00 PM)
+[2025-12-26T07:28:23.618Z] [INFO] ✅ True SOL start price fetched: $123.73 (Coinbase 15m open)
+[2025-12-26T07:28:23.625Z] [INFO] ✅ True ETH start price fetched: $2982.57 (Coinbase 15m open)
+[2025-12-26T07:28:23.633Z] [INFO] ✅ True BTC start price fetched: $89293.43 (Coinbase 15m open)
+[2025-12-26T07:28:23.634Z] [INFO] ✅ True XRP start price fetched: $1.8805 (Coinbase 15m open)
+[2025-12-26T07:28:23.635Z] [INFO] 🎯 Initial BTC start — time: 2:15:00 PM, price: $89293.43
+[2025-12-26T07:28:23.635Z] [INFO] 🎯 Initial ETH start — time: 2:15:00 PM, price: $2982.57
+[2025-12-26T07:28:23.635Z] [INFO] 🎯 Initial SOL start — time: 2:15:00 PM, price: $123.7300
+[2025-12-26T07:28:23.636Z] [INFO] 🎯 Initial XRP start — time: 2:15:00 PM, price: $1.8805
+[2025-12-26T07:28:23.646Z] [INFO] 🔧 Trading toggle active — type 'trade on/off', 'status' or 'balance'
+[2025-12-26T07:28:23.884Z] [INFO] ✅ MEXC Perpetual TRADE WS connected
+[2025-12-26T07:28:23.921Z] [INFO] ✅ Binance Perp WS connected
+[2025-12-26T07:28:24.026Z] [INFO] ✅ Gate.io Perpetual TRADE WS connected
+[2025-12-26T07:28:24.040Z] [INFO] ✅ Bitget Perpetual TRADE WS connected (V2)
+[2025-12-26T07:28:24.047Z] [INFO] ✅ Polymarket WS connected
+[2025-12-26T07:28:24.302Z] [INFO] ✅ Bybit Perpetual TRADE WS connected
+[2025-12-26T07:28:24.567Z] [INFO] ✅ OKX Perpetual TRADE WS connected
+[2025-12-26T07:28:25.681Z] [INFO] ✅ Coinbase Spot WS connected

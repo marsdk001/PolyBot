@@ -29,10 +29,14 @@ parentPort?.on("message", async (msg) => {
       .toString()
       .padStart(2, "0")}-${start.getMinutes().toString().padStart(2, "0")}`;
 
+    // Ensure plots directory exists (fixes missing folder issue on VPS)
+    await fs.promises.mkdir(plotsDir, { recursive: true });
+
     const filename = `${symbol}_${label}.html`;
     const filepath = path.join(plotsDir, filename);
 
     await fs.promises.writeFile(filepath, html, "utf8");
+    console.log(`💾 Saved plot: ${filename}`);
 
     // Cleanup old files (keep 24h = 1440 mins)
     await cleanupOldPlots(plotsDir, symbol, 1440);

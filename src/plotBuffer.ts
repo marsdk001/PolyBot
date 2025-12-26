@@ -10,11 +10,15 @@ let worker: Worker | null = null;
 function getWorker(): Worker {
   if (!worker) {
     // Auto-detect .ts vs .js for worker file
-    const workerFileName = __filename.endsWith(".ts")
-      ? "plotWorker.ts"
-      : "plotWorker.js";
-    worker = new Worker(path.join(__dirname, workerFileName));
+    const isTs = __filename.endsWith(".ts");
+    const workerFileName = isTs ? "plotWorker.ts" : "plotWorker.js";
+
+    worker = new Worker(path.join(__dirname, workerFileName), {
+      execArgv: isTs ? ["-r", "ts-node/register"] : undefined,
+    });
+
     worker.on("error", (err) => console.error("❌ Plot Worker Error:", err));
+    worker.on("online", () => console.log("✅ Plot Worker is online"));
   }
   return worker;
 }
@@ -66,6 +70,8 @@ export class PlotBuffer {
 
   private exportAndReset() {
     if (this.bucketStart === null || this.data.length === 0) return;
+
+    // console.log(`📤 Offloading ${this.data.length} points for ${this.symbol} to worker...`);
 
     // Offload to worker
     getWorker().postMessage({

@@ -23,9 +23,13 @@ import {
   DASHBOARD_INTERVAL_MS,
   TRADING_LOOP_MS,
   ACTIVE_EXCHANGES,
+  PLOTS_DIR,
 } from "./constants";
 import { AssetSymbol, Exchange, PlotPoint, FairProbs } from "./types";
 import readline from "readline";
+import * as fs from "fs";
+import * as path from "path";
+import * as util from "util";
 
 export class AutoTradingBot {
   private gbm: Record<AssetSymbol, Record<Exchange, GBMFairProbability>>;
@@ -296,12 +300,16 @@ export class AutoTradingBot {
   }
 
   async start() {
+    this.setupLogger();
+
     if (process.stdout.isTTY) {
       console.clear();
     }
     console.log(
       "Binance Perp + Multi-Exchange GBM → Polymarket Arbitrage Bot\n"
     );
+    console.log(`📂 Working Directory: ${process.cwd()}`);
+    console.log(`💾 Plots Directory: ${PLOTS_DIR}`);
 
     // 1. Initial market discovery
     await this.marketFinder.findMarkets();
@@ -436,7 +444,11 @@ export class AutoTradingBot {
     setInterval(() => this.onUpdate(), LOGIC_INTERVAL_MS);
 
     // 2. Dashboard Render Loop (Throttled to 1s to prevent console I/O blocking)
-    setInterval(() => this.renderDashboard(), DASHBOARD_INTERVAL_MS);
+    if (process.stdout.isTTY) {
+      setInterval(() => this.renderDashboard(), DASHBOARD_INTERVAL_MS);
+    } else {
+      console.log("📺 Dashboard disabled (Non-TTY detected) - Check logs/bot.log for output");
+    }
 
     // Trading check + rollover
     setInterval(async () => {
@@ -689,5 +701,42 @@ export class AutoTradingBot {
           100,
       });
     });
+  }
+
+  private setupLogger() {
+    const logDir = path.join(process.cwd(), "logs");
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    const logFile = path.join(logDir, "bot.log");
+    const logStream = fs.createWriteStream(logFile, { flags: "a" });
+
+    const formatMsg = (level: string, args: any[]) => {
+      const timestamp = new Date().toISOString();
+      const msg = util.format(...args);
+      return `[${timestamp}] [${level}] ${msg}\n`;
+    };
+
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+
+    console.log = (...args: any[]) => {
+      logStream.write(formatMsg("INFO", args));
+      originalLog.apply(console, args);
+    };
+
+    console.warn = (...args: any[]) => {
+      logStream.write(formatMsg("WARN", args));
+      originalWarn.apply(console, args);
+    };
+
+    console.error = (...args: any[]) => {
+      logStream.write(formatMsg("ERROR", args));
+      originalError.apply(console, args);
+    };
+    
+    console.log(`📝 Logging initialized. Outputting to: ${logFile}`);
   }
 }
