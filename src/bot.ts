@@ -646,7 +646,7 @@ export class AutoTradingBot {
 
       const combinedFairValue = this.fairCalculator.getCombinedExchangeFair(symbol);
       const polyUpVal = this.polymarketWs.book[symbol].UP.mid;
-      const diff = Math.abs(combinedFairValue - polyUpVal) * 100;
+      const spikeSignal = this.fairCalculator.getAggregateVelocity(symbol);
 
       this.plotBuffers[symbol].add({
         ts: now,
@@ -670,7 +670,7 @@ export class AutoTradingBot {
         deltaCoinbase: coinbaseDelta,
         deltaBinance: binanceDelta,
         
-        diff,
+        spikeSignal,
 
         // Fair probabilities
         fairUp: this.fairCalculator.fairProbs[symbol].UP * 100,

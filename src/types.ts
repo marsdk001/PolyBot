@@ -59,7 +59,7 @@ export type PlotPoint = {
   deltaCoinbase?: number;
   deltaBinance?: number;
 
-  diff?: number;
+  spikeSignal?: number;
 
   // 🔹 Hybrid fair (current production logic)
   fairUp?: number;

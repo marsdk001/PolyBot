@@ -63,6 +63,10 @@ export class FairCalculator {
     const minsLeft = (marketStartTime + 900_000 - now) / 60_000;
     if (minsLeft <= 0) return;
 
+    // Use aggregate velocity for spike detection (Combined Signal)
+    const aggVel = this.getAggregateVelocity(symbol);
+    const isSpike = Math.abs(aggVel) > 0.02;
+
     ACTIVE_EXCHANGES.forEach((exch) => {
       const currentPrice = this.getCurrentPrice(symbol, exch);
       const startPrice = this.getStartPrice(symbol, exch);
@@ -81,9 +85,7 @@ export class FairCalculator {
       const polyUp = this.getPolyBook(symbol).UP.mid;
 
       // Basis Calibration & Spike Logic
-      // 1. Calculate velocity of underlying asset
-      const recentPct = this.gbm[symbol][exch].getRecentPctChange(500);
-      const isSpike = Math.abs(recentPct) > 0.035; // > 0.05% move in 1s
+      // Note: isSpike is now calculated based on AGGREGATE velocity above
 
       if (polyUp > 0) {
         // Initialize basis if missing
@@ -193,5 +195,17 @@ export class FairCalculator {
 
     // Since individual fairs are already calibrated to Poly, we just average them.
     return Math.max(0.001, Math.min(0.999, rawAvg));
+  }
+
+  getAggregateVelocity(symbol: AssetSymbol): number {
+    let sum = 0;
+    let count = 0;
+    ACTIVE_EXCHANGES.forEach((exch) => {
+      if (this.gbm[symbol][exch]) {
+        sum += this.gbm[symbol][exch].getRecentPctChange(500);
+        count++;
+      }
+    });
+    return count > 0 ? sum / count : 0;
   }
 }

@@ -261,13 +261,13 @@ function generateHTML(symbol: string, data: any[]): string {
       visible: PLOT_VISIBLE_DELTAS,
     },
     
-    // Diff (Abs Edge)
+    // Spike Signal (Avg Velocity)
     {
       x: t,
-      y: data.map((d: any) => d.diff),
-      name: "Diff (Abs Edge)",
+      y: data.map((d: any) => d.spikeSignal),
+      name: "Spike Signal (Avg Vel)",
       yaxis: "y2",
-      line: { width: 2, color: "#ff0000", dash: "dot" },
+      line: { width: 2, color: "#ff0000" },
       mode: "lines",
       visible: true,
     },
