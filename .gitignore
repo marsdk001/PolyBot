@@ -3,3 +3,4 @@ plots/
 node_modules/
 dist/
 .credentials.json
+archives/
